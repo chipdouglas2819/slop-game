@@ -135,6 +135,20 @@ export interface PageState {
   bots: number // fraction 0..1 of bot engagement on this page
   recipe: Recipe
   manager: boolean // bought = no manual tap needed
+  cycleProgress: number // 0..1 — current cycle fill; tap to start when no manager
+}
+
+// Progressive disclosure markers — matches §5 Era I roll-out.
+// Pre-manager: tap to publish, no chips, no Trend ticker, no FactorStrip.
+// First-manager: Topic chip unlocks (and the FactorStrip + Trend ticker).
+// First Algorithm Update: Tactic chip unlocks (Era II).
+// (Model is engine-supported but stays cosmetically gated for later.)
+export interface ProgressionState {
+  topicChipUnlocked: boolean
+  tacticChipUnlocked: boolean
+  modelChipUnlocked: boolean
+  firstTapDone: boolean
+  firstManagerBought: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,6 +209,9 @@ export interface GameState {
 
   // Achievements
   unlocked: string[] // achievement ids
+
+  // Progressive UI disclosure markers
+  progression: ProgressionState
 
   // Timestamps
   lastTickAt: number

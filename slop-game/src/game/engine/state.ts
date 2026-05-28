@@ -5,17 +5,25 @@ import type {
   PageSlotDef,
   PageState,
   PlatformId,
+  ProgressionState,
   Recipe,
   TacticId,
   TopicId,
 } from './types'
-import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost } from './data'
+import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost, MODEL_CYCLE_COST, PLATFORMS } from './data'
 import {
+  affinityMult,
+  botEMult,
+  effectiveCPM,
   effectiveCycleSec,
-  pageProduction,
+  maxBuyable,
+  nextMilestone,
   recipeKey,
+  saturationMult,
   saturationRecover,
   slopScore,
+  tacticMult,
+  trendMult,
   unitCost,
 } from './math'
 import { rollTrend, shouldRotate } from './trend'
@@ -60,7 +68,16 @@ function makePage(slot: PageSlotDef): PageState {
     bots: 0,
     recipe: defaultRecipeFor(slot.platform),
     manager: false,
+    cycleProgress: 0,
   }
+}
+
+const INITIAL_PROGRESSION: ProgressionState = {
+  topicChipUnlocked: false,
+  tacticChipUnlocked: false,
+  modelChipUnlocked: false,
+  firstTapDone: false,
+  firstManagerBought: false,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -79,6 +96,7 @@ export function initialState(now: number = Date.now()): GameState {
     trend: rollTrend({ legible: true, now }),
     saturation: {},
     unlocked: [],
+    progression: { ...INITIAL_PROGRESSION },
     lastTickAt: now,
     startedAt: now,
     geoMultiplier: 1.0,
@@ -99,6 +117,7 @@ export type Action =
     }
   | { type: 'BUY_MANAGER'; pageIdx: number }
   | { type: 'SET_BOTS'; pageIdx: number; fraction: number }
+  | { type: 'TAP'; pageIdx: number }
   | { type: 'TICK'; now: number }
   | { type: 'PRESTIGE'; now: number }
   | { type: 'HARD_RESET'; now: number }
@@ -127,10 +146,8 @@ function checkRetuneAchievements(
     if (value === 'midjourney') s = maybeUnlock(s, 'write_me_10')
   }
   if (axis === 'tactic') {
-    // Any tactic change unlocks the India-emotional flavor achievement
     if (value !== DEFAULT_TACTIC[recipe.platform]) s = maybeUnlock(s, 'india_emotional')
   }
-  // Tidewater: fake_memoir × amazon × time_to_launch
   if (
     recipe.topic === 'fake_memoir' &&
     recipe.platform === 'amazon' &&
@@ -139,6 +156,25 @@ function checkRetuneAchievements(
     s = maybeUnlock(s, 'tidewater')
   }
   return s
+}
+
+// Compute the one-cycle payout snapshot for a page given the current state.
+function oneCyclePayout(state: GameState, page: PageState): {
+  E: number
+  dollars: number
+  modelCost: number
+} {
+  const slot = PAGE_SLOT_BY_ID[page.defId]
+  if (!slot || page.units <= 0) return { E: 0, dollars: 0, modelCost: 0 }
+  const score = slopScore(state, page.recipe).total
+  const geo = page.recipe.tactic === 'geo_boomers' ? 1.0 : 1.0
+  const baseE = slot.baseE * page.units
+  const E = baseE * score * botEMult(page.bots) * geo
+  const cpmGeo = page.recipe.tactic === 'geo_boomers' ? 1.5 : 1.0
+  const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
+  const dollars = (E / 1000) * cpm
+  const modelCost = MODEL_CYCLE_COST[page.recipe.model] * page.units
+  return { E, dollars, modelCost }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +205,6 @@ export function reduce(state: GameState, action: Action): GameState {
       if (state.unlockedSlots.includes(action.slotId)) return state
       const slot = PAGE_SLOT_BY_ID[action.slotId]
       if (!slot) return state
-      // Gate by cash
       const need = slot.unlock.cash ?? 0
       if (state.money.lt(need)) return state
       return {
@@ -195,12 +230,20 @@ export function reduce(state: GameState, action: Action): GameState {
       const slot = PAGE_SLOT_BY_ID[page.defId]
       const cost = new Decimal(managerCost(slot))
       if (state.money.lt(cost)) return state
+      const wasFirstManager = !state.progression.firstManagerBought
       return {
         ...state,
         money: state.money.minus(cost),
         pages: state.pages.map((p, i) =>
           i === action.pageIdx ? { ...p, manager: true } : p,
         ),
+        progression: wasFirstManager
+          ? {
+              ...state.progression,
+              firstManagerBought: true,
+              topicChipUnlocked: true, // §5 Era I — Topic × Platform live after first manager
+            }
+          : state.progression,
       }
     }
 
@@ -216,11 +259,23 @@ export function reduce(state: GameState, action: Action): GameState {
       }
     }
 
+    case 'TAP': {
+      const page = state.pages[action.pageIdx]
+      if (!page || page.units <= 0 || page.manager) return state
+      if (page.cycleProgress > 0) return state // cycle already in flight
+      return {
+        ...state,
+        pages: state.pages.map((p, i) =>
+          i === action.pageIdx ? { ...p, cycleProgress: 0.0001 } : p,
+        ),
+        progression: { ...state.progression, firstTapDone: true },
+      }
+    }
+
     case 'TICK': {
       const dtMs = Math.max(0, action.now - state.lastTickAt)
       if (dtMs <= 0) return { ...state, lastTickAt: action.now }
-      // Cap dt at 24h for offline progress (§9)
-      const dt = Math.min(dtMs, 24 * 60 * 60 * 1000) / 1000 // seconds
+      const dt = Math.min(dtMs, 24 * 60 * 60 * 1000) / 1000 // cap offline at 24h
 
       let money = state.money
       let lifetimeE = state.lifetimeE
@@ -231,21 +286,45 @@ export function reduce(state: GameState, action: Action): GameState {
       const pages = state.pages.map((p) => {
         const slot = PAGE_SLOT_BY_ID[p.defId]
         if (!slot || p.units <= 0) return p
-        const prod = pageProduction(state, p)
-        // Continuous flow model: integrate over dt.
-        // (Cycle is a UI/flavor detail — the math is continuous; manager-on
-        //  is the common Phase 1 case so we treat all pages as flowing.)
-        const eGained = prod.ePerSec * dt
-        const dollarsGained = prod.dollarsPerSec * dt
-        const modelCost = prod.modelCostPerSec * dt
-        money = money.plus(dollarsGained).minus(modelCost)
-        if (money.lt(0)) money = new Decimal(0) // can't go negative; cycle just halts
-        lifetimeE = lifetimeE.plus(eGained)
-        totalEPerSec += prod.ePerSec
-        // Saturation accrual on this recipe
-        const key = recipeKey(p.recipe)
-        activeKeys.add(key)
-        saturation[key] = (saturation[key] ?? 0) + eGained
+
+        // Pre-tap, no-manager page: idle.
+        if (!p.manager && p.cycleProgress === 0) return p
+
+        const cycleSec = effectiveCycleSec(slot, p.units)
+        const oneCycle = oneCyclePayout(state, p)
+        let progress = p.cycleProgress + dt / cycleSec
+        let completed = Math.floor(progress)
+        if (!p.manager) completed = Math.min(completed, 1) // one cycle per tap
+
+        if (completed > 0) {
+          const eGained = oneCycle.E * completed
+          const dollarsGained = oneCycle.dollars * completed
+          const modelCost = oneCycle.modelCost * completed
+          money = money.plus(dollarsGained).minus(modelCost)
+          if (money.lt(0)) money = new Decimal(0)
+          lifetimeE = lifetimeE.plus(eGained)
+          // Saturation accrues on the active recipe
+          const key = recipeKey(p.recipe)
+          activeKeys.add(key)
+          saturation[key] = (saturation[key] ?? 0) + eGained
+        }
+
+        // For a manager-on page, show a sensible /sec contribution
+        if (p.manager) {
+          totalEPerSec += oneCycle.E / cycleSec
+        }
+
+        // Compute next progress: managers keep going, non-managers stop after 1
+        let next: number
+        if (p.manager) {
+          next = progress - completed
+        } else {
+          next = completed > 0 ? 0 : progress
+        }
+
+        if (completed > 0 || next !== p.cycleProgress) {
+          return { ...p, cycleProgress: Math.max(0, Math.min(1, next)) }
+        }
         return p
       })
 
@@ -274,13 +353,15 @@ export function reduce(state: GameState, action: Action): GameState {
         lastTickAt: action.now,
       }
 
-      // Tick-time achievements
-      for (let i = 0; i < s.pages.length; i++) {
-        const p = s.pages[i]
-        if (!p || p.units <= 0) continue
-        const prod = pageProduction(s, p)
-        if (prod.dollarsPerSec >= 431) s = maybeUnlock(s, 'train_leaves')
-        if (prod.modelCostPerSec >= 1) s = maybeUnlock(s, 'gpus_melting')
+      // Tick-time achievements (only check manager-on pages — they have a real /sec)
+      for (const p of s.pages) {
+        if (!p || p.units <= 0 || !p.manager) continue
+        const oc = oneCyclePayout(s, p)
+        const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
+        const dollarsPerSec = oc.dollars / cycleSec
+        const modelCostPerSec = oc.modelCost / cycleSec
+        if (dollarsPerSec >= 431) s = maybeUnlock(s, 'train_leaves')
+        if (modelCostPerSec >= 1) s = maybeUnlock(s, 'gpus_melting')
       }
 
       return s
@@ -289,7 +370,17 @@ export function reduce(state: GameState, action: Action): GameState {
     case 'PRESTIGE': {
       const updated = applyAlgorithmUpdate(state, action.now)
       if (updated === state) return state
-      return maybeUnlock(updated, 'first_prestige')
+      let s = maybeUnlock(updated, 'first_prestige')
+      // §5 Era II — Tactic chip unlocks at the first Algorithm Update
+      s = {
+        ...s,
+        progression: {
+          ...s.progression,
+          tacticChipUnlocked: true,
+          modelChipUnlocked: true, // also unlock model at this beat for the prototype
+        },
+      }
+      return s
     }
 
     case 'HARD_RESET': {
@@ -301,11 +392,15 @@ export function reduce(state: GameState, action: Action): GameState {
 // ─────────────────────────────────────────────────────────────────────────────
 // Selectors used by the UI
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Total $/sec across all manager-on pages — used by the header readout.
 export function totalDollarsPerSec(state: GameState): number {
   let total = 0
   for (const p of state.pages) {
-    const prod = pageProduction(state, p)
-    total += prod.dollarsPerSec - prod.modelCostPerSec
+    if (!p.manager || p.units <= 0) continue
+    const oc = oneCyclePayout(state, p)
+    const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
+    total += oc.dollars / cycleSec - oc.modelCost / cycleSec
   }
   return total
 }
@@ -313,7 +408,10 @@ export function totalDollarsPerSec(state: GameState): number {
 export function totalEPerSec(state: GameState): number {
   let total = 0
   for (const p of state.pages) {
-    total += pageProduction(state, p).ePerSec
+    if (!p.manager || p.units <= 0) continue
+    const oc = oneCyclePayout(state, p)
+    const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
+    total += oc.E / cycleSec
   }
   return total
 }
@@ -329,3 +427,26 @@ export function pageCycleSec(state: GameState, pageIdx: number): number | null {
   if (!p) return null
   return effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
 }
+
+// Per-tap payout (for the Publish button label).
+export function pageTapPayout(state: GameState, pageIdx: number): {
+  dollars: number
+  modelCost: number
+} {
+  const p = state.pages[pageIdx]
+  if (!p) return { dollars: 0, modelCost: 0 }
+  const oc = oneCyclePayout(state, p)
+  return { dollars: oc.dollars, modelCost: oc.modelCost }
+}
+
+// Per-second payout (for manager-on pages).
+export function pageDollarsPerSec(state: GameState, pageIdx: number): number {
+  const p = state.pages[pageIdx]
+  if (!p || p.units <= 0) return 0
+  const oc = oneCyclePayout(state, p)
+  const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
+  return oc.dollars / cycleSec - oc.modelCost / cycleSec
+}
+
+// no-op references so re-exports stay tree-shakable
+export { affinityMult, tacticMult, trendMult, saturationMult, maxBuyable, nextMilestone }
