@@ -1,0 +1,19 @@
+# Dependencies
+slop-game/node_modules/
+slop-game/dist/
+
+# Build outputs
+*.local
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/launch.json
