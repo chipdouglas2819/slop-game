@@ -53,9 +53,7 @@ export function PageCard({ pageIdx }: Props) {
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-zinc-100 font-medium truncate">{slot.name}</span>
-            <span className="text-[10px] uppercase text-zinc-500 tracking-wider shrink-0">
-              {PLATFORMS[slot.platform].shortName}
-            </span>
+            <span className="text-[10px] text-zinc-600 shrink-0">on {PLATFORMS[slot.platform].name}</span>
             {page.units > 0 && (
               <span className="text-zinc-500 text-xs ml-auto shrink-0">×{page.units}</span>
             )}
@@ -64,7 +62,7 @@ export function PageCard({ pageIdx }: Props) {
             {page.units === 0
               ? slot.flavor ?? 'A blank page.'
               : chipsUnlocked
-              ? TOPICS[page.recipe.topic].name
+              ? `posting: ${TOPICS[page.recipe.topic].name}`
               : 'tap to publish'}
           </div>
         </div>
@@ -95,32 +93,25 @@ export function PageCard({ pageIdx }: Props) {
         </div>
       )}
 
-      {/* RATE READOUT — only meaningful with units */}
+      {/* RATE READOUT — money first, plain language */}
       {page.units > 0 && (
-        <div className="px-4 pb-3 flex items-center gap-3 text-sm">
+        <div className="px-4 pb-3 flex items-center gap-2 text-sm">
           {page.manager ? (
-            <>
-              <span className="text-zinc-100 font-mono">
-                {fmtMoney(dpsManager)}
-                <span className="text-zinc-500 text-xs">/sec</span>
-              </span>
-              {chipsUnlocked && (
-                <>
-                  <span className="text-zinc-500">·</span>
-                  <span className="text-zinc-300 font-mono text-xs">
-                    ×{score ? score.total.toFixed(2) : '—'}
-                  </span>
-                </>
-              )}
-              {isBurning && chipsUnlocked && (
-                <span className="text-orange-400 text-xs ml-auto" title="Saturation is biting">
-                  ⚠ burning
-                </span>
-              )}
-            </>
+            <span className="text-emerald-300 font-mono font-semibold">
+              {fmtMoney(dpsManager)}
+              <span className="text-zinc-500 text-xs font-normal"> /sec</span>
+            </span>
           ) : (
             <span className="text-zinc-300 font-mono text-xs">
-              {fmtMoney(tapPayout.dollars - tapPayout.modelCost)} per publish
+              earns {fmtMoney(tapPayout.dollars - tapPayout.modelCost)} per post
+            </span>
+          )}
+          {isBurning && chipsUnlocked && (
+            <span
+              className="text-orange-400 text-xs ml-auto"
+              title="You've posted this too much — switch the topic to refresh it"
+            >
+              ⚠ overused
             </span>
           )}
         </div>
@@ -156,38 +147,11 @@ export function PageCard({ pageIdx }: Props) {
         </div>
       )}
 
-      {/* BOTS SLIDER — gated to chips-unlocked */}
-      {chipsUnlocked && page.units > 0 && page.manager && (
-        <div className="px-4 pb-4 border-t border-zinc-800 pt-3">
-          <div className="flex items-center justify-between text-[11px] text-zinc-400 uppercase tracking-wider mb-1">
-            <span>Bots</span>
-            <span className="text-zinc-300 font-mono">{Math.round(page.bots * 100)}%</span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={Math.round(page.bots * 100)}
-            onChange={(e) =>
-              dispatch({
-                type: 'SET_BOTS',
-                pageIdx,
-                fraction: Number(e.target.value) / 100,
-              })
-            }
-            className="w-full accent-fuchsia-500"
-          />
-          <div className="text-[10px] text-zinc-600 mt-0.5">
-            More bots → more E, less CPM. The tradeoff is real.
-          </div>
-        </div>
-      )}
-
-      {/* CYCLE INFO — tucked at the bottom when expanded */}
+      {/* CYCLE INFO — plain language, no "halving" jargon */}
       {chipsUnlocked && page.units > 0 && (
-        <div className="px-4 pb-3 text-[10px] text-zinc-600 font-mono">
-          cycle {fmtSeconds(cycleSec)}
-          {milestone && <> · next halving @ {milestone} units</>}
+        <div className="px-4 pb-3 text-[10px] text-zinc-600">
+          {page.manager ? 'auto-posts' : 'posts'} every {fmtSeconds(cycleSec)}
+          {milestone && <> · speeds up at {milestone} copies</>}
         </div>
       )}
 
@@ -225,13 +189,12 @@ function Chip({ label, value, onClick }: { label: string; value: string; onClick
 }
 
 function PlatformAvatar({ id }: { id: PlatformId }) {
-  const p = PLATFORMS[id]
   return (
     <div
-      className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold"
+      className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center text-lg"
       style={{ background: COLORS[id] }}
     >
-      {p.shortName}
+      {EMOJI[id]}
     </div>
   )
 }
@@ -244,6 +207,16 @@ const COLORS: Record<PlatformId, string> = {
   google: '#7c3aed',
   tiktok: '#0891b2',
   linkedin: '#1e3a8a',
+}
+
+const EMOJI: Record<PlatformId, string> = {
+  facebook: '👴',
+  amazon: '📦',
+  spotify: '🎵',
+  yt_kids: '📺',
+  google: '🔍',
+  tiktok: '📱',
+  linkedin: '💼',
 }
 
 function PublishButton({

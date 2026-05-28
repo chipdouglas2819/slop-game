@@ -13,16 +13,16 @@ export function Onboarding() {
 
   let msg: string | null = null
   if (!hasUnit) {
-    msg = 'Tap “Buy ×1 (free)” to take ownership of your first page.'
+    msg = '👇 Tap “Buy ×1 (free)” to start your first page.'
   } else if (!hasTapped) {
-    msg = 'Tap the big Publish button — print your first engagement.'
+    msg = '👇 Tap the big Publish button to earn your first dollars.'
   } else if (!hasManager) {
-    msg = 'Buy more units, then hire the Account Manager so it runs itself.'
+    msg = 'Buy more copies to earn faster. Then hire a Manager so the page posts by itself.'
   } else if (!state.progression.topicChipUnlocked) {
     // edge case — managers always unlock the Topic chip in BUY_MANAGER reducer
     msg = null
   } else if (state.progression.topicChipUnlocked && state.pages.length === 1) {
-    msg = 'The Algorithm has tags. Match them — and watch the niche burn out.'
+    msg = '🔥 See "hot now" up top? Tap the Topic chip and pick one that matches — it pays a bonus. Posting the same thing too long wears it out (watch "Freshness").'
   }
 
   if (!msg) return null

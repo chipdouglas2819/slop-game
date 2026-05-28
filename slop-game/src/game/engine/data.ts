@@ -31,7 +31,7 @@ export const BAND_GLYPH: Record<Band, string> = {
 export const BAND_LABEL: Record<Band, string> = {
   great: 'Great',
   good: 'Good',
-  strange: 'Strange',
+  strange: 'Weak',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

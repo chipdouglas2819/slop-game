@@ -3,66 +3,72 @@ import {
   affinityBand,
   recipeKey,
   saturationGauge,
+  slopScore,
   tacticBand,
   trendDirection,
 } from '../engine/math'
 import { BAND_GLYPH, BAND_LABEL } from '../engine/data'
 import type { Recipe } from '../engine/types'
 
-// Diagnose strip (D5) — shows which factor is the weak link, by direction.
-// Saturation gets a real gauge because it's the visible self-correcting system;
-// the others are direction-only glyphs (the §10 rule).
+// Plain-language "why this earns what it does" breakdown. No designer jargon:
+// Affinity→"Topic fit", TacticSynergy→"Tactic fit", Trend→"Trending",
+// Saturation→"Freshness". Bands shown as glyph + word (never color alone).
 export function FactorStrip({ recipe }: { recipe: Recipe }) {
   const { state } = useStore()
   const aff = affinityBand(state, recipe)
   const tac = tacticBand(recipe)
   const trend = trendDirection(recipe, state.trend)
-  const sat = saturationGauge(state.saturation[recipeKey(recipe)])
+  const fresh = saturationGauge(state.saturation[recipeKey(recipe)])
+  const reach = slopScore(state, recipe).total
+  const tacticUnlocked = state.progression.tacticChipUnlocked
 
   return (
-    <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-zinc-400 font-mono">
-      <Factor label="Aff" glyph={BAND_GLYPH[aff]} title={`Affinity: ${BAND_LABEL[aff]}`} />
-      <span className="text-zinc-700">·</span>
-      <Factor label="Tac" glyph={BAND_GLYPH[tac]} title={`Tactic synergy: ${BAND_LABEL[tac]}`} />
-      <span className="text-zinc-700">·</span>
-      <Factor
-        label="Trend"
-        glyph={trend === 'hot' ? '🔥' : trend === 'cold' ? '❄' : '–'}
-        title={
-          trend === 'hot'
-            ? 'Trend: this recipe is trending up'
-            : trend === 'cold'
-            ? "Trend: suppressed — yesterday's flood"
-            : 'Trend: neutral'
-        }
-      />
-      <span className="text-zinc-700">·</span>
-      <Gauge value={sat} />
+    <div className="bg-zinc-800/40 rounded-lg px-3 py-2">
+      <div className="text-[11px] text-zinc-400 mb-1.5">
+        Each post reaches{' '}
+        <span className="text-zinc-100 font-mono font-semibold">×{reach.toFixed(1)}</span>{' '}
+        normal — here's why:
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+        <Factor label="Topic fit" glyph={BAND_GLYPH[aff]} word={BAND_LABEL[aff]} />
+        {tacticUnlocked && (
+          <Factor label="Tactic fit" glyph={BAND_GLYPH[tac]} word={BAND_LABEL[tac]} />
+        )}
+        <span className="flex items-center gap-1">
+          <span className="text-zinc-500">Trending</span>
+          {trend === 'hot' ? (
+            <span className="text-orange-400">🔥 yes</span>
+          ) : trend === 'cold' ? (
+            <span className="text-sky-400">over it</span>
+          ) : (
+            <span className="text-zinc-500">no</span>
+          )}
+        </span>
+        <Freshness value={fresh} />
+      </div>
     </div>
   )
 }
 
-function Factor({ label, glyph, title }: { label: string; glyph: string; title: string }) {
+function Factor({ label, glyph, word }: { label: string; glyph: string; word: string }) {
   return (
-    <span className="flex items-center gap-1" title={title}>
+    <span className="flex items-center gap-1">
       <span className="text-zinc-500">{label}</span>
-      <span className="text-base text-zinc-200">{glyph}</span>
+      <span className="text-zinc-100">{glyph} {word}</span>
     </span>
   )
 }
 
-function Gauge({ value }: { value: number }) {
+function Freshness({ value }: { value: number }) {
   const cells = 4
   const filled = Math.round(value * cells)
+  const low = value < 0.6
   return (
-    <span
-      className="flex items-center gap-1"
-      title={`Saturation freshness: ${Math.round(value * 100)}%`}
-    >
-      <span className="text-zinc-500">Sat</span>
-      <span className="font-mono text-zinc-200 tracking-tight">
+    <span className="flex items-center gap-1">
+      <span className="text-zinc-500">Freshness</span>
+      <span className="font-mono tracking-tight">
         {Array.from({ length: cells }).map((_, i) => (
-          <span key={i} className={i < filled ? 'text-zinc-200' : 'text-zinc-700'}>
+          <span key={i} className={i < filled ? (low ? 'text-orange-400' : 'text-emerald-400') : 'text-zinc-700'}>
             ▓
           </span>
         ))}
