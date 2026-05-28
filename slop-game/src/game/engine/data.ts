@@ -194,9 +194,11 @@ export const TACTIC_SYNERGY: Record<TacticId, Record<PlatformId, Band>> = {
 //  per §16 "engine supports all four now so the core can be felt in full")
 // ─────────────────────────────────────────────────────────────────────────────
 
-// baseE tuned so a fresh first-unit tap earns ~$1/cycle at start (matches the
-// AdvCap Lemonade Stand opening). Pre-manager the player taps; post-manager
-// it auto-loops. /3 from the earlier 1000× bump.
+// baseE tuned via the balance sim (npm run sim). Two rules:
+//  (1) a fresh Comment Spam unit earns ~$1/publish — the AdvCap opening feel;
+//  (2) each tier is ~1.4× more $/sec-efficient per dollar than the previous, so
+//      climbing the ladder is the reward (the classic idle "pull-forward").
+//      efficiency = baseE × CPM / 1000 / cycleSec / baseCost ramps 0.10 → 0.76.
 export const PAGE_SLOTS: PageSlotDef[] = [
   {
     id: 'comment_spam',
@@ -216,7 +218,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 60,
     baseCycleSec: 2.0,
     costCoef: 1.07,
-    baseE: 1500,
+    baseE: 21_000,
     unlock: { cash: 50 },
     flavor: '"10 things experts won\'t tell you about" — actual experts unconsulted.',
   },
@@ -227,7 +229,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 720,
     baseCycleSec: 4.0,
     costCoef: 1.08,
-    baseE: 7_000,
+    baseE: 700_000,
     unlock: { cash: 500 },
     flavor: '3,000-word personal essay before the recipe. The essay is also fake.',
   },
@@ -238,7 +240,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 8_640,
     baseCycleSec: 8.0,
     costCoef: 1.08,
-    baseE: 30_000,
+    baseE: 19_000_000,
     unlock: { cash: 6_000 },
     flavor: 'Boomers, here.',
   },
@@ -249,7 +251,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 103_680,
     baseCycleSec: 16.0,
     costCoef: 1.09,
-    baseE: 140_000,
+    baseE: 530_000_000,
     unlock: { cash: 75_000 },
     flavor: '3 uploads/day per account. Buy more accounts.',
   },
@@ -260,7 +262,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 1_240_000,
     baseCycleSec: 45.0,
     costCoef: 1.09,
-    baseE: 600_000,
+    baseE: 75_000_000_000,
     unlock: { cash: 800_000 },
     flavor: 'AI voiceover reading r/AmITheAsshole over 8 hours of Subway Surfers.',
   },
@@ -271,7 +273,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     baseCost: 14_900_000,
     baseCycleSec: 120.0,
     costCoef: 1.10,
-    baseE: 3_000_000,
+    baseE: 1_500_000_000_000,
     unlock: { cash: 10_000_000 },
     flavor: 'Thought leadership. The leader is a bot. The thought is a Gumroad funnel.',
   },

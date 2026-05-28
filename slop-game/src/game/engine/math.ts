@@ -236,10 +236,14 @@ export function maxBuyable(slot: PageSlotDef, owned: number, cash: Decimal): num
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Token math (soft prestige; §15)
-//   Tokens = 150 × √(lifetimeE / 1e15) − spent
+//   Tokens = 150 × √(lifetimeE / ANCHOR) − spent
+// ANCHOR retuned via the sim from the doc's first-pass 1e15 → 2e16 so the first
+// prestige lands at the ~5-min economy plateau (where there's nothing left to
+// buy), not at 2 min. A Phase-1 constant; revisit when Era gates exist.
 // ─────────────────────────────────────────────────────────────────────────────
+const TOKEN_ANCHOR = '2e16'
 export function tokensAvailable(lifetimeE: Decimal, spent: number): number {
-  const lifeNum = lifetimeE.div(new Decimal('1e15')).toNumber()
+  const lifeNum = lifetimeE.div(new Decimal(TOKEN_ANCHOR)).toNumber()
   if (!isFinite(lifeNum) || lifeNum <= 0) return 0
   const total = Math.floor(150 * Math.sqrt(lifeNum))
   return Math.max(0, total - spent)
