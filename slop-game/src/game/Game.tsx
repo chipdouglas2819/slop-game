@@ -5,6 +5,7 @@ import { WhileYouWereOut } from './ui/WhileYouWereOut'
 import { AchievementToast } from './ui/AchievementToast'
 import { Footer } from './ui/Footer'
 import { Onboarding } from './ui/Onboarding'
+import { ScandalResultToast } from './ui/ScandalResultToast'
 
 export function Game() {
   return (
@@ -15,6 +16,7 @@ export function Game() {
         <Feed />
         <Footer />
         <AchievementToast />
+        <ScandalResultToast />
         <WhileYouWereOut />
       </div>
     </StoreProvider>

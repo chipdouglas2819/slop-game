@@ -45,14 +45,28 @@ const snapAt = (
 ).filter((s) => s <= durationSec)
 let snapIdx = 0
 
+let scandalsResolved = 0
+let scandalsSeen = 0
+let prevScandalId: string | null = null
+
 const totalSteps = Math.ceil((durationSec * 1000) / STEP_MS)
 for (let i = 0; i < totalSteps; i++) {
   // Policy acts on current state, then time advances.
   const actions = decideActions(state)
-  for (const a of actions) state = reduce(state, a)
+  for (const a of actions) {
+    if (a.type === 'SCANDAL_RESOLVE') scandalsResolved++
+    state = reduce(state, a)
+  }
 
   nowMs += STEP_MS
   state = reduce(state, { type: 'TICK', now: nowMs })
+
+  // Track scandal arming
+  if (state.activeScandal && state.activeScandal.instanceId !== prevScandalId) {
+    scandalsSeen++
+    mark(`scandal armed (#${scandalsSeen}): ${state.activeScandal.headline}`)
+  }
+  prevScandalId = state.activeScandal?.instanceId ?? null
 
   // Milestones
   if (state.pages.some((p) => p.units > 0)) mark('first unit bought')
@@ -130,5 +144,7 @@ console.log(`  pages owned: ${state.pages.filter((p) => p.units > 0).length}`)
 console.log(`  total units: ${state.pages.reduce((n, p) => n + p.units, 0)}`)
 console.log(`  slop tokens: ${state.slopTokens}`)
 console.log(`  prestiges:   ${state.algorithmUpdatesCompleted}`)
-console.log(`  achievements:${state.unlocked.length}/10`)
+console.log(`  scandals:    ${scandalsSeen} armed, ${scandalsResolved} resolved`)
+console.log(`  signatures:  ${state.firedSignatureScandals.length}/7 fired`)
+console.log(`  achievements:${state.unlocked.length}/${13}`)
 console.log('')

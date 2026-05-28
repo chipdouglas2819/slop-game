@@ -181,6 +181,24 @@ export interface AchievementDef {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Scandal — the active "Goes Mainstream" interrupt (§7). Defined here with the
+// other state types; the scandal *engine* (triggers, resolution) lives in
+// scandals.ts.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ActiveScandal {
+  instanceId: string
+  signatureId: string | null // authored scandal id, or null = Systemic
+  pageIdx: number
+  topic: TopicId
+  platform: PlatformId
+  headline: string
+  line: string
+  spikeMult: number // HIDDEN payout multiplier
+  rideOnly: boolean
+  armedAt: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Full game state
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -209,6 +227,12 @@ export interface GameState {
 
   // Achievements
   unlocked: string[] // achievement ids
+
+  // Scandals (§7) — one active interrupt at a time; fired Signature ids persist
+  activeScandal: ActiveScandal | null
+  firedSignatureScandals: string[]
+  lastScandalResult: string | null // transient outcome summary for a toast
+  scandalCooldownUntil: number // ms timestamp — no new scandal arms before this
 
   // Progressive UI disclosure markers
   progression: ProgressionState

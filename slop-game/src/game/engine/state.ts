@@ -28,6 +28,8 @@ import {
 } from './math'
 import { rollTrend, shouldRotate } from './trend'
 import { applyAlgorithmUpdate } from './prestige'
+import { maybeArmScandal, resolveScandal, ignoreScandal } from './scandals'
+import type { ScandalChoice } from './scandals'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Default recipe per Platform — picks a sensible Great-affinity start
@@ -96,6 +98,10 @@ export function initialState(now: number = Date.now()): GameState {
     trend: rollTrend({ legible: true, now }),
     saturation: {},
     unlocked: [],
+    activeScandal: null,
+    firedSignatureScandals: [],
+    lastScandalResult: null,
+    scandalCooldownUntil: 0,
     progression: { ...INITIAL_PROGRESSION },
     lastTickAt: now,
     startedAt: now,
@@ -120,6 +126,9 @@ export type Action =
   | { type: 'TAP'; pageIdx: number }
   | { type: 'TICK'; now: number }
   | { type: 'PRESTIGE'; now: number }
+  | { type: 'SCANDAL_RESOLVE'; choice: ScandalChoice }
+  | { type: 'SCANDAL_IGNORE' }
+  | { type: 'CLEAR_SCANDAL_RESULT' }
   | { type: 'HARD_RESET'; now: number }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,14 +200,11 @@ export function reduce(state: GameState, action: Action): GameState {
       const pages = state.pages.map((p, i) =>
         i === action.pageIdx ? { ...p, units: p.units + action.count } : p,
       )
-      let s = {
+      return {
         ...state,
         money: state.money.minus(cost),
         pages,
       }
-      const newUnits = pages[action.pageIdx].units
-      if (newUnits >= 100) s = maybeUnlock(s, 'separate_legal_entity')
-      return s
     }
 
     case 'UNLOCK_SLOT': {
@@ -364,7 +370,31 @@ export function reduce(state: GameState, action: Action): GameState {
         if (modelCostPerSec >= 1) s = maybeUnlock(s, 'gpus_melting')
       }
 
+      // Scandals (§7) — over-pushed recipe may Go Mainstream. Arm at most one.
+      if (!s.activeScandal) {
+        const scandal = maybeArmScandal(s, dt)
+        if (scandal) s = { ...s, activeScandal: scandal }
+      }
+
       return s
+    }
+
+    case 'SCANDAL_RESOLVE': {
+      if (!state.activeScandal) return state
+      const { state: next, summary } = resolveScandal(state, action.choice)
+      return { ...next, lastScandalResult: summary }
+    }
+
+    case 'SCANDAL_IGNORE': {
+      if (!state.activeScandal) return state
+      return {
+        ...ignoreScandal(state),
+        lastScandalResult: 'You ignored it. The niche imploded and took half the page with it.',
+      }
+    }
+
+    case 'CLEAR_SCANDAL_RESULT': {
+      return { ...state, lastScandalResult: null }
     }
 
     case 'PRESTIGE': {

@@ -6,6 +6,7 @@ import type { Action } from '../game/engine/state'
 import type { GameState, TacticId, TopicId, ModelId } from '../game/engine/types'
 import { PAGE_SLOTS, PAGE_SLOT_BY_ID, PLATFORMS, TOPICS, TACTICS, MODELS, managerCost } from '../game/engine/data'
 import { slopScore, unitCost, tokensAvailable } from '../game/engine/math'
+import { scandalHints } from '../game/engine/scandals'
 import Decimal from 'break_infinity.js'
 
 const BUYS_PER_STEP = 12 // cap unit purchases per decision step to avoid loops
@@ -13,6 +14,18 @@ const PAYBACK_HORIZON_SEC = 120 // buy a unit only if it pays for itself within 
 
 export function decideActions(state: GameState): Action[] {
   const actions: Action[] = []
+
+  // 0) A scandal is an interrupt — resolve it before anything else. Pick the
+  //    sensible option from the hidden-state hints (mirrors a smart player).
+  if (state.activeScandal) {
+    const h = scandalHints(state)
+    let choice: 'ride' | 'cashout' | 'damage'
+    if (state.activeScandal.rideOnly) choice = 'ride'
+    else if (h.hasPivot) choice = 'cashout'
+    else if (h.stillHot && h.canAffordDamage) choice = 'damage'
+    else choice = 'ride'
+    return [{ type: 'SCANDAL_RESOLVE', choice }]
+  }
 
   // 1) Tap any page that can publish (no manager, idle cycle).
   state.pages.forEach((p, i) => {

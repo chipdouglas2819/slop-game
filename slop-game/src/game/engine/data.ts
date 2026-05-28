@@ -350,9 +350,12 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'tidewater', title: 'Tidewater Dreams', hint: "Isabel Allende's nonexistent novel." },
   { id: 'india_emotional', title: 'The Indian Audience Is Very Emotional', hint: '"…so you too should create a page like this."' },
   { id: 'write_me_10', title: 'WRITE ME 10 PROMPT', hint: 'A real creator\'s Midjourney prompt.' },
-  { id: 'separate_legal_entity', title: 'A Separate Legal Entity', hint: 'Air Canada, on its chatbot.' },
+  { id: 'separate_legal_entity', title: 'A Separate Legal Entity', hint: 'Damage-control a scandal — blame deflected.' },
   { id: 'gpus_melting', title: 'Our GPUs Are Melting', hint: 'The Ghibli Flood.' },
   { id: 'first_prestige', title: 'You Survived An Algorithm Change', hint: 'And the Algorithm sold the survival back to you as progress.' },
+  // Scandal achievements (§7 / §13)
+  { id: 'remarkable_submission', title: 'This Is a Remarkable Submission', hint: 'The tribunal judge, to Air Canada.' },
+  { id: 'gobstopper', title: 'Anti-Graffiti Gobstopper', hint: "The Wonka warehouse's magic sweet." },
 ]
 
 export const ACHIEVEMENT_BY_ID: Record<string, AchievementDef> = Object.fromEntries(
