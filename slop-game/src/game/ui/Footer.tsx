@@ -3,12 +3,14 @@ import type { ReactNode } from 'react'
 import { useStore } from '../store'
 import { ACHIEVEMENTS } from '../engine/data'
 import { clearSave } from '../engine/persistence'
+import { useLockBodyScroll } from './useLockBodyScroll'
 
 // Minimal footer — the one vanity drawer slot (§10). Just achievements + the
 // resource-tooltip thesis line, plus a hard-reset escape hatch for testing.
 export function Footer() {
   const { state, dispatch } = useStore()
   const [open, setOpen] = useState<'achievements' | 'about' | 'howto' | null>(null)
+  useLockBodyScroll(open !== null)
   const unlocked = state.unlocked.length
   const total = ACHIEVEMENTS.length
 

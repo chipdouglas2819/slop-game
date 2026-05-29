@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import {
   PAGE_SLOT_BY_ID,
   MODELS,
+  MODEL_CYCLE_COST,
   TOPICS,
   TACTICS,
   PLATFORMS,
@@ -44,6 +45,8 @@ export function PageCard({ pageIdx }: Props) {
   const milestone = nextMilestone(page.units)
   const cycleInFlight = page.cycleProgress > 0
   const canTap = page.units > 0 && !page.manager && !cycleInFlight
+  const modelCostPerPost = MODEL_CYCLE_COST[page.recipe.model] * page.units
+  const losingMoney = page.manager && dpsManager < 0
 
   return (
     <div className="bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -95,9 +98,9 @@ export function PageCard({ pageIdx }: Props) {
 
       {/* RATE READOUT — money first, plain language */}
       {page.units > 0 && (
-        <div className="px-4 pb-3 flex items-center gap-2 text-sm">
+        <div className="px-4 pb-1 flex items-center gap-2 text-sm">
           {page.manager ? (
-            <span className="text-emerald-300 font-mono font-semibold">
+            <span className={`font-mono font-semibold ${losingMoney ? 'text-red-400' : 'text-emerald-300'}`}>
               {fmtMoney(dpsManager)}
               <span className="text-zinc-500 text-xs font-normal"> /sec</span>
             </span>
@@ -114,6 +117,35 @@ export function PageCard({ pageIdx }: Props) {
               ⚠ overused
             </span>
           )}
+        </div>
+      )}
+
+      {/* MODEL RUNNING COST — surfaced so an expensive model isn't a silent drain */}
+      {page.units > 0 && modelCostPerPost > 0 && (
+        <div className="px-4 pb-2 text-[11px]">
+          {losingMoney ? (
+            <span className="text-red-400">
+              ⚠ {MODELS[page.recipe.model].name} costs more to run than it earns — switch to a
+              cheaper model or grow this page.
+            </span>
+          ) : (
+            <span className="text-zinc-500">
+              running {MODELS[page.recipe.model].name}: −{fmtMoney(MODEL_CYCLE_COST[page.recipe.model])}
+              /post
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* MANAGER PROGRESS BAR — keep the "when am I paid" feedback after automating */}
+      {page.units > 0 && page.manager && (
+        <div className="px-4 pb-2">
+          <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+            <div
+              className="h-full bg-emerald-500/70"
+              style={{ width: `${Math.min(100, page.cycleProgress * 100)}%`, transition: 'width 90ms linear' }}
+            />
+          </div>
         </div>
       )}
 

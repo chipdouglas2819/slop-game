@@ -4,11 +4,13 @@ import {
   BAND_GLYPH,
   BAND_LABEL,
   MODELS,
+  MODEL_CYCLE_COST,
   PLATFORMS,
   TACTICS,
   TOPICS,
 } from '../engine/data'
 import type { ModelId, Recipe, TacticId, TopicId } from '../engine/types'
+import { useLockBodyScroll } from './useLockBodyScroll'
 
 type Axis = 'model' | 'topic' | 'tactic'
 
@@ -37,6 +39,7 @@ const AXIS_HELP: Record<Axis, { title: string; help: string }> = {
 
 export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
   const { state } = useStore()
+  useLockBodyScroll()
   const opts = listOptions(axis)
   const help = AXIS_HELP[axis]
 
@@ -105,8 +108,15 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
                         <span className="text-zinc-300">{BAND_LABEL[band]} fit</span>
                       </span>
                     ) : (
-                      <span className="text-zinc-300 text-xs">
+                      <span className="text-zinc-300 text-xs text-right">
                         reach ×{(opt as { tier?: number }).tier?.toFixed(1) ?? '?'}
+                        {MODEL_CYCLE_COST[opt.id as ModelId] > 0 ? (
+                          <div className="text-[10px] text-red-400">
+                            costs ${MODEL_CYCLE_COST[opt.id as ModelId]}/post to run
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-emerald-500">free to run</div>
+                        )}
                       </span>
                     )}
                     {trend === 'hot' && (

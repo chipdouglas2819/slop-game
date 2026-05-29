@@ -60,8 +60,8 @@ export function AlgorithmBar() {
           </div>
         </div>
       ) : (
-        <div className="max-w-md mx-auto px-3 pb-2 text-[11px] text-zinc-500 italic">
-          tap a page below to start posting
+        <div className="max-w-md mx-auto px-3 pb-2 text-[11px] text-zinc-600 italic">
+          an idle game where the gameplay is the moral compromise
         </div>
       )}
     </header>

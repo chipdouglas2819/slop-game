@@ -283,10 +283,12 @@ export const PAGE_SLOT_BY_ID: Record<string, PageSlotDef> = Object.fromEntries(
   PAGE_SLOTS.map((s) => [s.id, s]),
 )
 
-// Manager (Account-Management Software) flat cost per slot — buying removes manual taps
+// Manager (Account-Management Software) — flat price per slot that SCALES with
+// tier (AdvCap: $1K Lemonade → $10B Bank), never a flat floor. ~60× the page's
+// base unit cost makes it a real "tap for a while, then automate" goal and
+// keeps every tier's manager distinct.
 export function managerCost(slot: PageSlotDef): number {
-  // Order-of-magnitude flat price scaled to slot tier
-  return Math.max(1000, slot.baseCost * 10)
+  return Math.max(200, Math.round(slot.baseCost * 60))
 }
 
 // Milestone halvings: at 25/50/100/200/300/400 units the cycle halves (§15)
