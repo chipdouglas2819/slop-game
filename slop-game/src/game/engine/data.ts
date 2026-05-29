@@ -115,16 +115,16 @@ export const MODEL_CYCLE_COST: Record<ModelId, number> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TOPICS: Record<TopicId, TopicDef> = {
-  shrimp_jesus: { id: 'shrimp_jesus', name: 'Shrimp / Fruit Jesus', tags: ['religion', 'ai_aesthetic'] },
-  africa_boys: { id: 'africa_boys', name: '"Africa Boys" Sculpture', tags: ['wholesome', 'parasocial', 'ai_aesthetic'] },
-  sob_bait: { id: 'sob_bait', name: 'Disaster Sob-Bait', tags: ['fear', 'rage', 'parasocial'] },
-  mushroom_guide: { id: 'mushroom_guide', name: 'Mushroom Foraging Guide', tags: ['wholesome', 'food', 'fear'] },
-  fake_memoir: { id: 'fake_memoir', name: 'Fake Memoir of Real Author', tags: ['parasocial', 'money'] },
-  lofi: { id: 'lofi', name: 'Lo-Fi / Ambient', tags: ['nostalgia', 'wholesome'] },
-  finger_family: { id: 'finger_family', name: 'Finger-Family / Nursery', tags: ['kids', 'nostalgia'] },
-  glue_pizza: { id: 'glue_pizza', name: 'Glue-Pizza / Eat-A-Rock', tags: ['food', 'ai_aesthetic'] },
-  recipe_mill: { id: 'recipe_mill', name: 'Recipe Mill', tags: ['food'] },
-  agree_fable: { id: 'agree_fable', name: '"Agree?" Inspirational Fable', tags: ['wholesome', 'parasocial', 'money'] },
+  shrimp_jesus: { id: 'shrimp_jesus', name: 'Shrimp / Fruit Jesus', tags: ['religion', 'ai_aesthetic'], flavor: 'Surreal AI religious images for the faithful' },
+  africa_boys: { id: 'africa_boys', name: '"Africa Boys" Sculpture', tags: ['wholesome', 'parasocial', 'ai_aesthetic'], flavor: 'Fake "made it with my own hands!" art' },
+  sob_bait: { id: 'sob_bait', name: 'Disaster Sob-Bait', tags: ['fear', 'rage', 'parasocial'], flavor: 'Tearjerker disaster photos that beg for likes' },
+  mushroom_guide: { id: 'mushroom_guide', name: 'Mushroom Foraging Guide', tags: ['wholesome', 'food', 'fear'], flavor: 'AI foraging book that misidentifies the deadly ones' },
+  fake_memoir: { id: 'fake_memoir', name: 'Fake Memoir of Real Author', tags: ['parasocial', 'money'], flavor: 'A book a real author never wrote, timed to their launch' },
+  lofi: { id: 'lofi', name: 'Lo-Fi / Ambient', tags: ['nostalgia', 'wholesome'], flavor: 'Endless ghost-artist chill beats' },
+  finger_family: { id: 'finger_family', name: 'Finger-Family / Nursery', tags: ['kids', 'nostalgia'], flavor: 'Cursed nursery-rhyme videos for toddlers' },
+  glue_pizza: { id: 'glue_pizza', name: 'Glue-Pizza / Eat-A-Rock', tags: ['food', 'ai_aesthetic'], flavor: 'AI "life hacks" that are actively dangerous' },
+  recipe_mill: { id: 'recipe_mill', name: 'Recipe Mill', tags: ['food'], flavor: 'SEO recipe pages buried under a fake life story' },
+  agree_fable: { id: 'agree_fable', name: '"Agree?" Inspirational Fable', tags: ['wholesome', 'parasocial', 'money'], flavor: 'LinkedIn parables that funnel to a course' },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

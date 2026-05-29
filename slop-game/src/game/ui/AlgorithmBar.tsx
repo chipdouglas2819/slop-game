@@ -1,15 +1,19 @@
+import { useState } from 'react'
 import { useStore } from '../store'
 import { canPrestige, tokensAvailable } from '../engine/math'
+import { PrestigeSheet } from './PrestigeSheet'
 import { totalDollarsPerSec } from '../engine/state'
 import { TAG_LABEL } from '../engine/data'
 import { fmtMoney } from '../format'
 import { isTelegraphing } from '../engine/trend'
 
 // The top bar. Money first. Trending is explained ("post these for bonus $")
-// and always shows its bonus. The inert Zombie meter is hidden until the bots
-// system gives it a real payoff. Prestige appears only when it's available.
+// and shows its bonus only while legible (pre-first-prestige). The inert Zombie
+// meter is gone until the bots system gives it a payoff. Prestige opens the
+// plain-language confirm sheet.
 export function AlgorithmBar() {
-  const { state, dispatch } = useStore()
+  const { state } = useStore()
+  const [showPrestige, setShowPrestige] = useState(false)
   const ready = canPrestige(state)
   const tokensIfPrestige = tokensAvailable(state.lifetimeE, state.slopTokens)
   const rate = totalDollarsPerSec(state)
@@ -17,59 +21,57 @@ export function AlgorithmBar() {
   const telegraphing = showTrend && isTelegraphing(state.trend, Date.now())
 
   return (
-    <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-      {/* Money row — always the headline */}
-      <div className="max-w-md mx-auto px-3 pt-2 pb-1 flex items-center justify-between">
-        <div>
-          <div className="text-emerald-300 font-mono text-lg font-semibold leading-none">
-            {fmtMoney(state.money)}
+    <>
+      <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
+        <div className="max-w-md mx-auto px-3 pt-2 pb-1 flex items-center justify-between">
+          <div>
+            <div className="text-emerald-300 font-mono text-lg font-semibold leading-none">
+              {fmtMoney(state.money)}
+            </div>
+            <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{fmtMoney(rate)}/sec</div>
           </div>
-          <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
-            {fmtMoney(rate)}/sec
-          </div>
+
+          {ready && (
+            <button
+              onClick={() => setShowPrestige(true)}
+              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-fuchsia-700 hover:bg-fuchsia-600 border-fuchsia-500 text-white animate-pulse"
+            >
+              ⚡ Algorithm Update
+              <span className="ml-1 font-mono">+{tokensIfPrestige}</span>
+            </button>
+          )}
         </div>
 
-        {ready && (
-          <button
-            onClick={() => dispatch({ type: 'PRESTIGE', now: Date.now() })}
-            className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-fuchsia-700 hover:bg-fuchsia-600 border-fuchsia-500 text-white animate-pulse"
-            title={`Reset your pages for ${tokensIfPrestige} permanent Slop Tokens (each one makes everything earn a little more, forever).`}
-          >
-            ⚡ Algorithm Update
-            <span className="ml-1 font-mono">+{tokensIfPrestige}</span>
-          </button>
+        {showTrend ? (
+          <div className="max-w-md mx-auto px-3 pb-2">
+            <div className="text-[10px] uppercase tracking-wider text-zinc-500 leading-none">
+              {telegraphing
+                ? '⚠ the algorithm is about to change…'
+                : state.trend.legible
+                ? '🔥 hot now — post these for bonus $'
+                : '🔥 hot now — match these (the algorithm hides the numbers)'}
+            </div>
+            <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar">
+              {state.trend.hot.map((h) => (
+                <span
+                  key={h.tag}
+                  className="text-xs text-zinc-200 whitespace-nowrap bg-zinc-800/60 rounded px-1.5 py-0.5"
+                >
+                  {TAG_LABEL[h.tag] ?? h.tag}
+                  {state.trend.legible && (
+                    <span className="ml-1 text-orange-400 font-mono">×{h.magnitude.toFixed(1)}</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto px-3 pb-2 text-[11px] text-zinc-600 italic">
+            an idle game where the gameplay is the moral compromise
+          </div>
         )}
-      </div>
-
-      {/* Trending row — only once the player can act on it */}
-      {showTrend ? (
-        <div className="max-w-md mx-auto px-3 pb-2">
-          <div className="text-[10px] uppercase tracking-wider text-zinc-500 leading-none">
-            {telegraphing
-              ? '⚠ the algorithm is about to change…'
-              : state.trend.legible
-              ? '🔥 hot now — post these for bonus $'
-              : '🔥 hot now — match these (the algorithm hides the numbers)'}
-          </div>
-          <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar">
-            {state.trend.hot.map((h) => (
-              <span
-                key={h.tag}
-                className="text-xs text-zinc-200 whitespace-nowrap bg-zinc-800/60 rounded px-1.5 py-0.5"
-              >
-                {TAG_LABEL[h.tag] ?? h.tag}
-                {state.trend.legible && (
-                  <span className="ml-1 text-orange-400 font-mono">×{h.magnitude.toFixed(1)}</span>
-                )}
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="max-w-md mx-auto px-3 pb-2 text-[11px] text-zinc-600 italic">
-          an idle game where the gameplay is the moral compromise
-        </div>
-      )}
-    </header>
+      </header>
+      {showPrestige && <PrestigeSheet onClose={() => setShowPrestige(false)} />}
+    </>
   )
 }

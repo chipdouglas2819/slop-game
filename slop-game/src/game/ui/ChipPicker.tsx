@@ -25,11 +25,11 @@ interface Props {
 const AXIS_HELP: Record<Axis, { title: string; help: string }> = {
   topic: {
     title: 'What to post',
-    help: 'Pick something that fits this page (◆ Great = best), and match a 🔥 trending tag for bonus money.',
+    help: 'Pick something that fits this page (★★★ = best), and match a 🔥 trending tag for bonus money.',
   },
   tactic: {
     title: 'How to push it',
-    help: 'Some tricks work better on some platforms. ◆ Great = best fit for this page.',
+    help: 'Some tricks work better on some platforms. ★★★ = best fit for this page.',
   },
   model: {
     title: 'What makes it',
@@ -96,15 +96,13 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
                       )}
                     </div>
                     {'flavor' in opt && opt.flavor && (
-                      <div className="text-xs text-zinc-500 mt-0.5 italic truncate">
-                        {opt.flavor}
-                      </div>
+                      <div className="text-xs text-zinc-500 mt-0.5 italic truncate">{opt.flavor}</div>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     {showBand !== 'tier' ? (
                       <span className="text-zinc-200 text-xs flex items-center gap-1">
-                        <span className="text-base">{BAND_GLYPH[band]}</span>
+                        <span className="text-amber-300">{BAND_GLYPH[band]}</span>
                         <span className="text-zinc-300">{BAND_LABEL[band]} fit</span>
                       </span>
                     ) : (
@@ -150,14 +148,10 @@ function trendBonusPercent(candidate: Recipe, state: ReturnType<typeof useStore>
 }
 
 // Order options so the BEST fit for THIS page floats to the top (Great → Good →
-// Weak), so a platform feels like it wants specific content and there's always a
-// legible next pick. Models stay in tier order.
+// Weak), so each platform feels like it wants specific content and there's
+// always a legible next pick. Models stay in tier order.
 const BAND_RANK: Record<string, number> = { great: 3, good: 2, strange: 1 }
-function sortedOptions(
-  axis: Axis,
-  state: ReturnType<typeof useStore>['state'],
-  recipe: Recipe,
-) {
+function sortedOptions(axis: Axis, state: ReturnType<typeof useStore>['state'], recipe: Recipe) {
   if (axis === 'model') return Object.values(MODELS)
   if (axis === 'topic') {
     return Object.values(TOPICS)

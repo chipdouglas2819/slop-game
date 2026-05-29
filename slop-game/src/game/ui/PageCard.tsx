@@ -9,28 +9,15 @@ import {
   PLATFORMS,
   managerCost,
 } from '../engine/data'
-import {
-  effectiveCycleSec,
-  maxBuyable,
-  nextMilestone,
-  unitCost,
-} from '../engine/math'
-import {
-  pageDollarsPerSec,
-  pageScore,
-  pageTapPayout,
-} from '../engine/state'
+import { effectiveCycleSec, maxBuyable, nextMilestone, unitCost } from '../engine/math'
+import { pageDollarsPerSec, pageScore, pageTapPayout } from '../engine/state'
 import { fmtMoney, fmtSeconds } from '../format'
 import { FactorStrip } from './FactorStrip'
 import { ChipPicker } from './ChipPicker'
 import Decimal from 'break_infinity.js'
 import type { ModelId, PlatformId, TacticId, TopicId } from '../engine/types'
 
-interface Props {
-  pageIdx: number
-}
-
-export function PageCard({ pageIdx }: Props) {
+export function PageCard({ pageIdx }: { pageIdx: number }) {
   const { state, dispatch } = useStore()
   const page = state.pages[pageIdx]
   const slot = PAGE_SLOT_BY_ID[page.defId]
@@ -76,29 +63,17 @@ export function PageCard({ pageIdx }: Props) {
       {/* CHIPS — hidden until first manager bought (§5 Era I roll-out) */}
       {chipsUnlocked && page.units > 0 && (
         <div className="px-4 pb-2 flex flex-wrap gap-2">
-          <Chip
-            label="Topic"
-            value={TOPICS[page.recipe.topic].name}
-            onClick={() => setPicker('topic')}
-          />
+          <Chip label="Topic" value={TOPICS[page.recipe.topic].name} onClick={() => setPicker('topic')} />
           {state.progression.tacticChipUnlocked && (
-            <Chip
-              label="Tactic"
-              value={TACTICS[page.recipe.tactic].name}
-              onClick={() => setPicker('tactic')}
-            />
+            <Chip label="Tactic" value={TACTICS[page.recipe.tactic].name} onClick={() => setPicker('tactic')} />
           )}
           {state.progression.modelChipUnlocked && (
-            <Chip
-              label="Model"
-              value={MODELS[page.recipe.model].name}
-              onClick={() => setPicker('model')}
-            />
+            <Chip label="Model" value={MODELS[page.recipe.model].name} onClick={() => setPicker('model')} />
           )}
         </div>
       )}
 
-      {/* RATE READOUT — money first, plain language */}
+      {/* RATE READOUT — money first */}
       {page.units > 0 && (
         <div className="px-4 pb-1 flex items-center gap-2 text-sm">
           {page.manager ? (
@@ -122,18 +97,17 @@ export function PageCard({ pageIdx }: Props) {
         </div>
       )}
 
-      {/* MODEL RUNNING COST — surfaced so an expensive model isn't a silent drain */}
+      {/* MODEL RUNNING COST — so an expensive model isn't a silent drain */}
       {page.units > 0 && modelCostPerPost > 0 && (
         <div className="px-4 pb-2 text-[11px]">
           {losingMoney ? (
             <span className="text-red-400">
-              ⚠ {MODELS[page.recipe.model].name} costs more to run than it earns — switch to a
-              cheaper model or grow this page.
+              ⚠ {MODELS[page.recipe.model].name} costs more to run than it earns — switch to a cheaper
+              model or grow this page.
             </span>
           ) : (
             <span className="text-zinc-500">
-              running {MODELS[page.recipe.model].name}: −{fmtMoney(MODEL_CYCLE_COST[page.recipe.model])}
-              /post
+              running {MODELS[page.recipe.model].name}: −{fmtMoney(MODEL_CYCLE_COST[page.recipe.model])}/post
             </span>
           )}
         </div>
@@ -181,11 +155,11 @@ export function PageCard({ pageIdx }: Props) {
         </div>
       )}
 
-      {/* CYCLE INFO — plain language, no "halving" jargon */}
+      {/* CYCLE INFO — plain language */}
       {chipsUnlocked && page.units > 0 && (
         <div className="px-4 pb-3 text-[10px] text-zinc-600">
           {page.manager ? 'auto-posts' : 'posts'} every {fmtSeconds(cycleSec)}
-          {milestone && <> · speeds up at {milestone} copies</>}
+          {milestone && <> · speeds up + earns more at {milestone} copies</>}
         </div>
       )}
 
@@ -214,9 +188,7 @@ function Chip({ label, value, onClick }: { label: string; value: string; onClick
       onClick={onClick}
       className="text-xs bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded-lg px-2.5 py-1.5 flex flex-col items-start"
     >
-      <span className="text-[10px] uppercase text-zinc-500 tracking-wider leading-none">
-        {label}
-      </span>
+      <span className="text-[10px] uppercase text-zinc-500 tracking-wider leading-none">{label}</span>
       <span className="text-zinc-100 leading-tight mt-0.5">{value}</span>
     </button>
   )
@@ -275,7 +247,6 @@ function PublishButton({
         disabled={!canTap}
         className="relative w-full overflow-hidden rounded-xl bg-fuchsia-700 disabled:bg-zinc-800 text-white font-semibold py-3 text-base"
       >
-        {/* fill */}
         <span
           className="absolute inset-y-0 left-0 bg-fuchsia-500/60"
           style={{ width: `${Math.min(100, progress * 100)}%`, transition: 'width 80ms linear' }}
@@ -284,16 +255,12 @@ function PublishButton({
           {inFlight ? (
             <>
               <span>Publishing…</span>
-              <span className="text-xs opacity-70 font-mono">
-                ~{fmtSeconds(cycleSec * (1 - progress))}
-              </span>
+              <span className="text-xs opacity-70 font-mono">~{fmtSeconds(cycleSec * (1 - progress))}</span>
             </>
           ) : (
             <>
               <span>Publish</span>
-              <span className="text-xs opacity-80 font-mono">
-                +{fmtMoney(payoutDollars)}
-              </span>
+              <span className="text-xs opacity-80 font-mono">+{fmtMoney(payoutDollars)}</span>
             </>
           )}
         </span>
@@ -306,7 +273,7 @@ function BuyButtons({ pageIdx }: { pageIdx: number }) {
   const { state, dispatch } = useStore()
   const page = state.pages[pageIdx]
   const slot = PAGE_SLOT_BY_ID[page.defId]
-  const counts: number[] = page.units === 0 ? [1] : [1, 10]
+  const counts: number[] = page.units === 0 ? [1] : [1, 10, 100]
   const maxN = maxBuyable(slot, page.units, state.money)
 
   return (
@@ -326,18 +293,14 @@ function BuyButtons({ pageIdx }: { pageIdx: number }) {
               Buy ×{n}
               {free && page.units === 0 ? ' (free)' : ''}
             </div>
-            <div className="text-[10px] text-zinc-400 font-mono">
-              {free ? '—' : fmtMoney(cost)}
-            </div>
+            <div className="text-[10px] text-zinc-400 font-mono">{free ? '—' : fmtMoney(cost)}</div>
           </button>
         )
       })}
       {page.units > 0 && (
         <button
           disabled={maxN < 1}
-          onClick={() =>
-            dispatch({ type: 'BUY_UNITS', pageIdx, count: Math.max(1, maxN) })
-          }
+          onClick={() => dispatch({ type: 'BUY_UNITS', pageIdx, count: Math.max(1, maxN) })}
           className="flex-1 bg-fuchsia-700 hover:bg-fuchsia-600 disabled:bg-zinc-800/40 disabled:text-zinc-600 border border-fuchsia-500 disabled:border-zinc-800 rounded-lg py-2 text-xs"
         >
           <div className="font-semibold text-zinc-100">MAX</div>
@@ -361,9 +324,7 @@ function ManagerButton({ pageIdx, cost }: { pageIdx: number; cost: Decimal }) {
         Hire Account Manager
         <span className="ml-2 text-[10px] text-zinc-400 font-mono">{fmtMoney(cost)}</span>
       </div>
-      <div className="text-[10px] text-zinc-500 italic mt-0.5">
-        You automate yourself out of your own farm.
-      </div>
+      <div className="text-[10px] text-zinc-500 italic mt-0.5">You automate yourself out of your own farm.</div>
     </button>
   )
 }
