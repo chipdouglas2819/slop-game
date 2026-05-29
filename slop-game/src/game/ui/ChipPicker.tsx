@@ -40,7 +40,7 @@ const AXIS_HELP: Record<Axis, { title: string; help: string }> = {
 export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
   const { state } = useStore()
   useLockBodyScroll()
-  const opts = listOptions(axis)
+  const opts = sortedOptions(axis, state, recipe)
   const help = AXIS_HELP[axis]
 
   return (
@@ -86,7 +86,7 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
                   }}
                   className={`w-full text-left px-4 py-3 border-b border-zinc-800 hover:bg-zinc-800/60 flex items-center justify-between gap-3 ${
                     isCurrent ? 'bg-zinc-800/40' : ''
-                  }`}
+                  } ${showBand !== 'tier' && band === 'strange' ? 'opacity-45' : ''}`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-zinc-100 truncate">
@@ -121,7 +121,8 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
                     )}
                     {trend === 'hot' && (
                       <span className="text-[11px] text-orange-400 font-mono whitespace-nowrap">
-                        🔥 +{trendBonusPercent(candidate, state)}%
+                        🔥 trending
+                        {state.trend.legible ? ` +${trendBonusPercent(candidate, state)}%` : ''}
                       </span>
                     )}
                   </div>
@@ -148,8 +149,30 @@ function trendBonusPercent(candidate: Recipe, state: ReturnType<typeof useStore>
   return Math.round((mult - 1) * 100)
 }
 
-function listOptions(axis: Axis) {
+// Order options so the BEST fit for THIS page floats to the top (Great → Good →
+// Weak), so a platform feels like it wants specific content and there's always a
+// legible next pick. Models stay in tier order.
+const BAND_RANK: Record<string, number> = { great: 3, good: 2, strange: 1 }
+function sortedOptions(
+  axis: Axis,
+  state: ReturnType<typeof useStore>['state'],
+  recipe: Recipe,
+) {
   if (axis === 'model') return Object.values(MODELS)
-  if (axis === 'topic') return Object.values(TOPICS)
+  if (axis === 'topic') {
+    return Object.values(TOPICS)
+      .slice()
+      .sort(
+        (a, b) =>
+          BAND_RANK[affinityBand(state, { ...recipe, topic: b.id })] -
+          BAND_RANK[affinityBand(state, { ...recipe, topic: a.id })],
+      )
+  }
   return Object.values(TACTICS)
+    .slice()
+    .sort(
+      (a, b) =>
+        BAND_RANK[tacticBand({ ...recipe, tactic: b.id })] -
+        BAND_RANK[tacticBand({ ...recipe, tactic: a.id })],
+    )
 }

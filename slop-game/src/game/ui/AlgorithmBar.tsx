@@ -45,7 +45,11 @@ export function AlgorithmBar() {
       {showTrend ? (
         <div className="max-w-md mx-auto px-3 pb-2">
           <div className="text-[10px] uppercase tracking-wider text-zinc-500 leading-none">
-            {telegraphing ? '⚠ the algorithm is about to change…' : '🔥 hot now — post these for bonus $'}
+            {telegraphing
+              ? '⚠ the algorithm is about to change…'
+              : state.trend.legible
+              ? '🔥 hot now — post these for bonus $'
+              : '🔥 hot now — match these (the algorithm hides the numbers)'}
           </div>
           <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar">
             {state.trend.hot.map((h) => (
@@ -54,7 +58,9 @@ export function AlgorithmBar() {
                 className="text-xs text-zinc-200 whitespace-nowrap bg-zinc-800/60 rounded px-1.5 py-0.5"
               >
                 {TAG_LABEL[h.tag] ?? h.tag}
-                <span className="ml-1 text-orange-400 font-mono">×{h.magnitude.toFixed(1)}</span>
+                {state.trend.legible && (
+                  <span className="ml-1 text-orange-400 font-mono">×{h.magnitude.toFixed(1)}</span>
+                )}
               </span>
             ))}
           </div>

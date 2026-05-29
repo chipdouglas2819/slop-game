@@ -55,12 +55,14 @@ export function PageCard({ pageIdx }: Props) {
         <PlatformAvatar id={slot.platform} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-zinc-100 font-medium truncate">{slot.name}</span>
-            <span className="text-[10px] text-zinc-600 shrink-0">on {PLATFORMS[slot.platform].name}</span>
+            <span className="text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
+              {PLATFORMS[slot.platform].name}
+            </span>
             {page.units > 0 && (
               <span className="text-zinc-500 text-xs ml-auto shrink-0">×{page.units}</span>
             )}
           </div>
+          <div className="text-zinc-100 font-medium truncate leading-tight">{slot.name}</div>
           <div className="text-xs text-zinc-500 truncate italic mt-0.5">
             {page.units === 0
               ? slot.flavor ?? 'A blank page.'
