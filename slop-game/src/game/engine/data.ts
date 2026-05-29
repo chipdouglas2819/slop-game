@@ -22,10 +22,12 @@ export const BAND_VALUE: Record<Band, number> = {
   strange: 0.6,
 }
 
+// Ordinal star meter (reads as a scale on sight, unlike ◆◇△). Pairs with the
+// word label so it's never glyph-only (accessibility / the doc's §10 rule).
 export const BAND_GLYPH: Record<Band, string> = {
-  great: '◆',
-  good: '◇',
-  strange: '△',
+  great: '★★★',
+  good: '★★☆',
+  strange: '★☆☆',
 }
 
 export const BAND_LABEL: Record<Band, string> = {
