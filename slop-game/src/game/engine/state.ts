@@ -101,11 +101,29 @@ export function initialState(now: number = Date.now()): GameState {
     firedSignatureScandals: [],
     lastScandalResult: null,
     scandalCooldownUntil: 0,
+    monetization: {
+      clout: 0,
+      permanentMult: 1,
+      boostUntilMs: 0,
+      boostsToday: 0,
+      boostDayStartMs: now,
+      spentRealCentsPretend: 0,
+    },
     progression: { ...INITIAL_PROGRESSION },
     lastTickAt: now,
     startedAt: now,
     geoMultiplier: 1.0,
   }
+}
+
+// Monetization SIMULATION constants (D11 guardrails)
+const MAX_PERMANENT_MULT = 3 // hard cap — the whale hook can never become pay-to-win
+const BOOST_DURATION_MS = 4 * 60 * 60 * 1000 // 4h, like AdvCap's rewarded-ad boost
+const BOOST_DAILY_CAP = 5
+const TIME_WARP_HOURS = 4
+
+export function boostActive(state: GameState, now: number): boolean {
+  return (state.monetization?.boostUntilMs ?? 0) > now
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +146,10 @@ export type Action =
   | { type: 'SCANDAL_RESOLVE'; choice: ScandalChoice }
   | { type: 'SCANDAL_IGNORE' }
   | { type: 'CLEAR_SCANDAL_RESULT' }
+  | { type: 'BUY_CLOUT'; clout: number; centsPretend: number }
+  | { type: 'BUY_PERMANENT_MULT'; cloutCost: number; mult: number }
+  | { type: 'WATCH_AD_BOOST'; now: number }
+  | { type: 'TIME_WARP'; cloutCost: number }
   | { type: 'HARD_RESET'; now: number }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -273,6 +295,7 @@ export function reduce(state: GameState, action: Action): GameState {
       let totalEPerSec = 0
       const saturation = { ...state.saturation }
       const activeKeys = new Set<string>()
+      const boost = boostActive(state, action.now) ? 2 : 1 // simulated 2× ad boost
 
       const pages = state.pages.map((p) => {
         const slot = PAGE_SLOT_BY_ID[p.defId]
@@ -289,7 +312,7 @@ export function reduce(state: GameState, action: Action): GameState {
 
         if (completed > 0) {
           const eGained = oneCycle.E * completed
-          const dollarsGained = oneCycle.dollars * completed
+          const dollarsGained = oneCycle.dollars * completed * boost
           const modelCost = oneCycle.modelCost * completed
           money = money.plus(dollarsGained).minus(modelCost)
           if (money.lt(0)) money = new Decimal(0)
@@ -399,6 +422,61 @@ export function reduce(state: GameState, action: Action): GameState {
         },
       }
       return s
+    }
+
+    case 'BUY_CLOUT': {
+      const m = state.monetization
+      return {
+        ...state,
+        monetization: {
+          ...m,
+          clout: m.clout + action.clout,
+          spentRealCentsPretend: m.spentRealCentsPretend + action.centsPretend,
+        },
+      }
+    }
+
+    case 'BUY_PERMANENT_MULT': {
+      const m = state.monetization
+      if (m.clout < action.cloutCost) return state
+      const next = Math.min(MAX_PERMANENT_MULT, m.permanentMult + action.mult)
+      if (next <= m.permanentMult) return state // already capped
+      return {
+        ...state,
+        monetization: { ...m, clout: m.clout - action.cloutCost, permanentMult: next },
+      }
+    }
+
+    case 'WATCH_AD_BOOST': {
+      const m = state.monetization
+      let boostsToday = m.boostsToday
+      let boostDayStartMs = m.boostDayStartMs
+      if (action.now - boostDayStartMs > 24 * 60 * 60 * 1000) {
+        boostsToday = 0
+        boostDayStartMs = action.now
+      }
+      if (boostsToday >= BOOST_DAILY_CAP) return state
+      const base = Math.max(action.now, m.boostUntilMs)
+      return {
+        ...state,
+        monetization: {
+          ...m,
+          boostUntilMs: base + BOOST_DURATION_MS,
+          boostsToday: boostsToday + 1,
+          boostDayStartMs,
+        },
+      }
+    }
+
+    case 'TIME_WARP': {
+      const m = state.monetization
+      if (m.clout < action.cloutCost) return state
+      const grant = Math.max(0, totalDollarsPerSec(state)) * TIME_WARP_HOURS * 3600
+      return {
+        ...state,
+        money: state.money.plus(grant),
+        monetization: { ...m, clout: m.clout - action.cloutCost },
+      }
     }
 
     case 'HARD_RESET': {

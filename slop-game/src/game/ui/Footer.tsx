@@ -4,12 +4,14 @@ import { useStore } from '../store'
 import { ACHIEVEMENTS } from '../engine/data'
 import { clearSave } from '../engine/persistence'
 import { useLockBodyScroll } from './useLockBodyScroll'
+import { SlopStore } from './SlopStore'
 
 // Minimal footer — the one vanity drawer slot (§10). Just achievements + the
 // resource-tooltip thesis line, plus a hard-reset escape hatch for testing.
 export function Footer() {
   const { state, dispatch } = useStore()
   const [open, setOpen] = useState<'achievements' | 'about' | 'howto' | null>(null)
+  const [storeOpen, setStoreOpen] = useState(false)
   useLockBodyScroll(open !== null)
   const unlocked = state.unlocked.length
   const total = ACHIEVEMENTS.length
@@ -23,6 +25,9 @@ export function Footer() {
             className="text-fuchsia-300 hover:text-fuchsia-200 font-medium"
           >
             ❓ How to play
+          </button>
+          <button onClick={() => setStoreOpen(true)} className="text-amber-300 hover:text-amber-200">
+            🛒 Store
           </button>
           <button
             onClick={() => setOpen('achievements')}
@@ -145,6 +150,7 @@ export function Footer() {
           </div>
         </div>
       )}
+      {storeOpen && <SlopStore onClose={() => setStoreOpen(false)} />}
     </>
   )
 }

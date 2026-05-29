@@ -161,7 +161,8 @@ export function cyclePayout(state: GameState, page: PageState): CyclePayout {
   const cpmGeo =
     page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_CPM_MULT : state.geoMultiplier
   const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
-  const dollars = (E / 1000) * cpm * profitMult(page.units)
+  const permanent = state.monetization?.permanentMult ?? 1 // reset-surviving IAP boost
+  const dollars = (E / 1000) * cpm * profitMult(page.units) * permanent
   const modelCost = MODEL_CYCLE_COST[page.recipe.model] * page.units
   return { E, dollars, modelCost }
 }

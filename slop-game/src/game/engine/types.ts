@@ -152,6 +152,22 @@ export interface ProgressionState {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Monetization SIMULATION (D11) — a fake, non-charging store so the feel of an
+// ethical-F2P layer can be tried. Guardrail invariants (enforced in the
+// reducer): permanentMult product is capped; boost is time-bounded + daily-
+// capped; nothing here touches affinity/tactic/trend (no pay-to-win on the
+// decision system); no time-limited offers or loot boxes.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface MonetizationState {
+  clout: number // premium currency (granted by FAKE purchases)
+  permanentMult: number // reset-surviving global $ multiplier (whale hook), capped
+  boostUntilMs: number // a 2× income boost is active while now < this
+  boostsToday: number // capped per day (rewarded-ad analog)
+  boostDayStartMs: number // rolling 24h window start for the cap
+  spentRealCentsPretend: number // running "you would have spent" tally, for the joke
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Trend — rotating partially-hidden multiplier (§4.5, D2)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -236,6 +252,9 @@ export interface GameState {
 
   // Progressive UI disclosure markers
   progression: ProgressionState
+
+  // Monetization SIMULATION (D11 — fake store, no real charges)
+  monetization: MonetizationState
 
   // Timestamps
   lastTickAt: number
