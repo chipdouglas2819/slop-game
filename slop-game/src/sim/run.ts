@@ -22,10 +22,18 @@ const seed = Number(process.argv[3] ?? 1)
 Math.random = mulberry32(seed)
 
 // Import engine AFTER patching Math.random so initial trend roll is seeded.
-const { initialState, reduce, totalDollarsPerSec } = await import('../game/engine/state')
+const { initialState, reduce, totalDollarsPerSec, pageDollarsPerSec } = await import('../game/engine/state')
 const { decideActions } = await import('./policy')
 const { PAGE_SLOT_BY_ID } = await import('../game/engine/data')
 const { fmtMoney, fmtNumber, fmtSeconds } = await import('../game/format')
+
+// % of total $/sec contributed by the first page (Comment Spam) — the direct
+// test of whether milestone profit multipliers keep OLD tiers relevant.
+function firstPageSharePct(s: Parameters<typeof totalDollarsPerSec>[0]): number {
+  const total = totalDollarsPerSec(s)
+  if (total <= 0) return 0
+  return Math.round((pageDollarsPerSec(s, 0) / total) * 100)
+}
 
 const STEP_MS = 200 // game-time per sim step
 const t0 = 0
@@ -142,6 +150,7 @@ console.log(`  $/sec:       ${fmtMoney(totalDollarsPerSec(state))}`)
 console.log(`  lifetime E:  ${fmtNumber(state.lifetimeE)}`)
 console.log(`  pages owned: ${state.pages.filter((p) => p.units > 0).length}`)
 console.log(`  total units: ${state.pages.reduce((n, p) => n + p.units, 0)}`)
+console.log(`  page 1 share:${firstPageSharePct(state)}% of $/sec (high = old tiers stay relevant)`)
 console.log(`  slop tokens: ${state.slopTokens}`)
 console.log(`  prestiges:   ${state.algorithmUpdatesCompleted}`)
 console.log(`  scandals:    ${scandalsSeen} armed, ${scandalsResolved} resolved`)

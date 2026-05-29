@@ -10,11 +10,10 @@ import type {
   TacticId,
   TopicId,
 } from './types'
-import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost, MODEL_CYCLE_COST, PLATFORMS } from './data'
+import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost } from './data'
 import {
   affinityMult,
-  botEMult,
-  effectiveCPM,
+  cyclePayout,
   effectiveCycleSec,
   maxBuyable,
   nextMilestone,
@@ -167,24 +166,8 @@ function checkRetuneAchievements(
   return s
 }
 
-// Compute the one-cycle payout snapshot for a page given the current state.
-function oneCyclePayout(state: GameState, page: PageState): {
-  E: number
-  dollars: number
-  modelCost: number
-} {
-  const slot = PAGE_SLOT_BY_ID[page.defId]
-  if (!slot || page.units <= 0) return { E: 0, dollars: 0, modelCost: 0 }
-  const score = slopScore(state, page.recipe).total
-  const geo = page.recipe.tactic === 'geo_boomers' ? 1.0 : 1.0
-  const baseE = slot.baseE * page.units
-  const E = baseE * score * botEMult(page.bots) * geo
-  const cpmGeo = page.recipe.tactic === 'geo_boomers' ? 1.5 : 1.0
-  const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
-  const dollars = (E / 1000) * cpm
-  const modelCost = MODEL_CYCLE_COST[page.recipe.model] * page.units
-  return { E, dollars, modelCost }
-}
+// Per-cycle payout — the single shared production formula lives in math.ts.
+const oneCyclePayout = cyclePayout
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reducer
@@ -213,6 +196,8 @@ export function reduce(state: GameState, action: Action): GameState {
       if (!slot) return state
       const need = slot.unlock.cash ?? 0
       if (state.money.lt(need)) return state
+      // Lifetime-views gate too, so a single cash spike can't skip the ladder.
+      if (slot.unlock.lifetimeE && state.lifetimeE.lt(slot.unlock.lifetimeE)) return state
       return {
         ...state,
         unlockedSlots: [...state.unlockedSlots, action.slotId],
@@ -298,7 +283,7 @@ export function reduce(state: GameState, action: Action): GameState {
 
         const cycleSec = effectiveCycleSec(slot, p.units)
         const oneCycle = oneCyclePayout(state, p)
-        let progress = p.cycleProgress + dt / cycleSec
+        const progress = p.cycleProgress + dt / cycleSec
         let completed = Math.floor(progress)
         if (!p.manager) completed = Math.min(completed, 1) // one cycle per tap
 
@@ -309,11 +294,14 @@ export function reduce(state: GameState, action: Action): GameState {
           money = money.plus(dollarsGained).minus(modelCost)
           if (money.lt(0)) money = new Decimal(0)
           lifetimeE = lifetimeE.plus(eGained)
-          // Saturation accrues on the active recipe
-          const key = recipeKey(p.recipe)
-          activeKeys.add(key)
-          saturation[key] = (saturation[key] ?? 0) + eGained
         }
+
+        // Saturation is TIME-based: accrue the active seconds onto this recipe
+        // (independent of units/E/profit), so "freshness" reads as a steady
+        // timer and a flooded niche cools while you run something else.
+        const key = recipeKey(p.recipe)
+        activeKeys.add(key)
+        saturation[key] = (saturation[key] ?? 0) + dt
 
         // For a manager-on page, show a sensible /sec contribution
         if (p.manager) {
@@ -334,11 +322,11 @@ export function reduce(state: GameState, action: Action): GameState {
         return p
       })
 
-      // Idle recipes decay
+      // Idle recipes recover (staleness decays with a ~2.5min half-life)
       for (const key of Object.keys(saturation)) {
         if (!activeKeys.has(key)) {
           saturation[key] = saturationRecover(saturation[key], dtMs)
-          if (saturation[key] < 1) delete saturation[key]
+          if (saturation[key] < 0.5) delete saturation[key]
         }
       }
 

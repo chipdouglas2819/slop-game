@@ -5,11 +5,13 @@
 import type { Action } from '../game/engine/state'
 import type { GameState, TacticId, TopicId, ModelId } from '../game/engine/types'
 import { PAGE_SLOTS, PAGE_SLOT_BY_ID, PLATFORMS, TOPICS, TACTICS, MODELS, managerCost } from '../game/engine/data'
-import { slopScore, unitCost, tokensAvailable } from '../game/engine/math'
+import { profitMult, slopScore, unitCost, tokensAvailable } from '../game/engine/math'
 import { scandalHints } from '../game/engine/scandals'
 import Decimal from 'break_infinity.js'
 
-const BUYS_PER_STEP = 12 // cap unit purchases per decision step to avoid loops
+// ~2 buys per 200ms step ≈ 10 purchase-actions/sec — an actively-tapping human,
+// not the old superhuman 60/sec that made the sim read far faster than real play.
+const BUYS_PER_STEP = 2
 const PAYBACK_HORIZON_SEC = 120 // buy a unit only if it pays for itself within this
 
 export function decideActions(state: GameState): Action[] {
@@ -174,12 +176,13 @@ function bestUnitBuy(
     const owned = p.units + (pendingByPage.get(i) ?? 0)
     const cost = unitCost(slot, owned, 1)
     if (cost.gt(budget)) return // only consider what we can afford this step
-    // Marginal $/sec from +1 unit ≈ current per-unit contribution (incl. CPM).
+    // Marginal $/sec from +1 unit ≈ current per-unit contribution (incl. CPM
+    // and the milestone profit multiplier, so mature pages are valued right).
     const score = slopScore(state, p.recipe).total
     const marginalE = slot.baseE * score // per cycle
     const cycleSec = slot.baseCycleSec // ignore halvings for the estimate
     const cpm = PLATFORMS[slot.platform].cpm
-    const marginalDps = (marginalE / cycleSec / 1000) * cpm
+    const marginalDps = (marginalE / cycleSec / 1000) * cpm * profitMult(owned)
     if (marginalDps <= 0) return
     const payback = cost.toNumber() / marginalDps
     if (!best || payback < best.payback) best = { pageIdx: i, cost, payback }

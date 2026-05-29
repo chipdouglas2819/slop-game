@@ -94,26 +94,76 @@ export function trendDirection(r: Recipe, trend: TrendState): 'hot' | 'cold' | '
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Saturation (§4.6)
+// Saturation (§4.6) — TIME-based, so "freshness" is a legible timer the player
+// can read: post the same recipe for a couple of minutes and it goes stale;
+// switch away and it recovers in a few minutes (the migration IS the gameplay).
+// The saturation map now stores ACTIVE SECONDS per recipe (not cumulative E) so
+// a 1-unit page and a 400-unit page burn at the same readable rate, and the
+// profit-multiplier inflation never touches it.
 // ─────────────────────────────────────────────────────────────────────────────
 const SATURATION_FLOOR = 0.35
-const SATURATION_K = 1e-7 // tuning constant; gives ~0.7 at s=1e7
+const SATURATION_K = 0.012 // ~0.6 at ~150s active, floor by ~10 min continuous
+const SATURATION_HALFLIFE_MS = 150_000 // idle recipe recovers half its staleness every 2.5 min
 
-export function saturationMult(cumulativeE: number | undefined): number {
-  if (!cumulativeE) return 1.0
-  const v = 1 / Math.sqrt(1 + SATURATION_K * cumulativeE)
+export function saturationMult(activeSeconds: number | undefined): number {
+  if (!activeSeconds) return 1.0
+  const v = 1 / Math.sqrt(1 + SATURATION_K * activeSeconds)
   return Math.max(SATURATION_FLOOR, v)
 }
 
-// Recovery: idle recipes decay s back toward 0 over time (~1%/min currently)
-const SATURATION_RECOVERY_PER_MS = 0.0001 / 60_000 // ~0.0001/sec → exp decay
 export function saturationRecover(s: number, dtMs: number): number {
-  return s * Math.exp(-SATURATION_RECOVERY_PER_MS * dtMs)
+  return s * Math.exp(-(Math.LN2 / SATURATION_HALFLIFE_MS) * dtMs)
 }
 
-// Get the visible Saturation gauge value as a 0..1 "freshness" (1 = fresh, 0 = burned)
-export function saturationGauge(cumulativeE: number | undefined): number {
-  return saturationMult(cumulativeE) // same as the multiplier; floors at 0.35
+// Visible "freshness" 0..1 (1 = fresh, floors at 0.35 = burned)
+export function saturationGauge(activeSeconds: number | undefined): number {
+  return saturationMult(activeSeconds)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Milestone PROFIT multipliers (AdvCap §2) — the mechanic that keeps OLD tiers
+// earning so you buy ALL of them (not just the newest). ×3 at 25 & 50, ×2 at
+// 100/200/300/400 → ×144 on a maxed page. Applied to DOLLARS only (see
+// cyclePayout) so it doesn't inflate lifetime-E / prestige timing / saturation.
+// ─────────────────────────────────────────────────────────────────────────────
+export function profitMult(units: number): number {
+  let m = 1
+  for (const ms of MILESTONES) {
+    if (units >= ms) m *= ms === 25 || ms === 50 ? 3 : 2
+  }
+  return m
+}
+
+// Next profit-multiplier milestone + the multiplier it grants (for the UI)
+export function nextProfitMilestone(units: number): { at: number; mult: number } | null {
+  for (const ms of MILESTONES) {
+    if (units < ms) return { at: ms, mult: ms === 25 || ms === 50 ? 3 : 2 }
+  }
+  return null
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE one production formula — per cycle. Everything (tick, selectors, scandals,
+// sim) derives from this. profitMult boosts dollars; E stays un-inflated.
+// ─────────────────────────────────────────────────────────────────────────────
+export interface CyclePayout {
+  E: number // engagements ("views") this cycle
+  dollars: number // gross $ this cycle (incl. milestone profit multiplier)
+  modelCost: number // $ burned running the model this cycle
+}
+
+export function cyclePayout(state: GameState, page: PageState): CyclePayout {
+  const slot = PAGE_SLOT_BY_ID[page.defId]
+  if (!slot || page.units <= 0) return { E: 0, dollars: 0, modelCost: 0 }
+  const score = slopScore(state, page.recipe).total
+  const geoE = page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_E_MULT : 1
+  const E = slot.baseE * page.units * score * botEMult(page.bots) * geoE
+  const cpmGeo =
+    page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_CPM_MULT : state.geoMultiplier
+  const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
+  const dollars = (E / 1000) * cpm * profitMult(page.units)
+  const modelCost = MODEL_CYCLE_COST[page.recipe.model] * page.units
+  return { E, dollars, modelCost }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -151,32 +201,6 @@ export function effectiveCPM(platformCpm: number, geoMult: number, botFrac: numb
 const BOT_YIELD_AT_MAX = 4 // at b=1, E ×5 total
 export function botEMult(botFrac: number): number {
   return 1 + BOT_YIELD_AT_MAX * botFrac
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Page production — per-second
-// Returns { ePerSec, dollarsPerSec, modelCostPerSec }
-// ─────────────────────────────────────────────────────────────────────────────
-export function pageProduction(state: GameState, page: PageState): {
-  ePerSec: number
-  dollarsPerSec: number
-  modelCostPerSec: number
-} {
-  const slot = PAGE_SLOT_BY_ID[page.defId]
-  if (!slot || page.units <= 0) return { ePerSec: 0, dollarsPerSec: 0, modelCostPerSec: 0 }
-  const cycle = effectiveCycleSec(slot, page.units)
-  const cyclesPerSec = 1 / cycle
-  const score = slopScore(state, page.recipe).total
-  // Geo tactic check
-  const geo = page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_E_MULT : 1
-  const baseE = slot.baseE * page.units * cyclesPerSec
-  const ePerSec = baseE * score * botEMult(page.bots) * geo
-  // Money side: CPM in dollars per 1000 engagements
-  const cpmGeo = page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_CPM_MULT : state.geoMultiplier
-  const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
-  const dollarsPerSec = (ePerSec / 1000) * cpm
-  const modelCostPerSec = MODEL_CYCLE_COST[page.recipe.model] * page.units * cyclesPerSec
-  return { ePerSec, dollarsPerSec, modelCostPerSec }
 }
 
 // Cycle seconds after milestone halvings (§15)
@@ -241,7 +265,7 @@ export function maxBuyable(slot: PageSlotDef, owned: number, cash: Decimal): num
 // prestige lands at the ~5-min economy plateau (where there's nothing left to
 // buy), not at 2 min. A Phase-1 constant; revisit when Era gates exist.
 // ─────────────────────────────────────────────────────────────────────────────
-const TOKEN_ANCHOR = '2e16'
+const TOKEN_ANCHOR = '3e15'
 export function tokensAvailable(lifetimeE: Decimal, spent: number): number {
   const lifeNum = lifetimeE.div(new Decimal(TOKEN_ANCHOR)).toNumber()
   if (!isFinite(lifeNum) || lifeNum <= 0) return 0
@@ -249,7 +273,14 @@ export function tokensAvailable(lifetimeE: Decimal, spent: number): number {
   return Math.max(0, total - spent)
 }
 
-// Phase 1 prestige threshold — first Algorithm Update fires once tokens available ≥ 1
+// First Algorithm Update is gated behind a lifetime-views FLOOR (not just
+// tokens ≥ 1) so the reset button can't appear in the first couple minutes —
+// idle-canon wants the first prestige to land deeper in, as a considered choice
+// (~tens of tokens at once), not the instant the economy plateaus.
+const PRESTIGE_LIFETIME_FLOOR = '1e13'
 export function canPrestige(state: GameState): boolean {
+  if (state.algorithmUpdatesCompleted === 0 && state.lifetimeE.lt(new Decimal(PRESTIGE_LIFETIME_FLOOR))) {
+    return false
+  }
   return tokensAvailable(state.lifetimeE, state.slopTokens) >= 1
 }

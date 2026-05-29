@@ -194,11 +194,16 @@ export const TACTIC_SYNERGY: Record<TacticId, Record<PlatformId, Band>> = {
 //  per §16 "engine supports all four now so the core can be felt in full")
 // ─────────────────────────────────────────────────────────────────────────────
 
-// baseE tuned via the balance sim (npm run sim). Two rules:
-//  (1) a fresh Comment Spam unit earns ~$1/publish — the AdvCap opening feel;
-//  (2) each tier is ~1.4× more $/sec-efficient per dollar than the previous, so
-//      climbing the ladder is the reward (the classic idle "pull-forward").
-//      efficiency = baseE × CPM / 1000 / cycleSec / baseCost ramps 0.10 → 0.76.
+// baseE + gates tuned via the balance sim (npm run sim). Design rules:
+//  (1) a fresh Comment Spam unit earns ~$1/publish — the AdvCap opening feel.
+//  (2) per-dollar efficiency is roughly FLAT across tiers (gentle ~1.08×/tier,
+//      0.10→~0.16) — NOT the old 1.4× "pull-forward". Tier identity now comes
+//      from the milestone PROFIT multipliers (math.ts profitMult) + Trend, so
+//      a maxed early page (×144) stays a real earner and you buy ALL of them
+//      (AdvCap "every business matters", not "newest wins").
+//  (3) unlock gates are staggered (cash AND lifetime-views) so the 7 slots
+//      arrive over ~20-60 min and a single cash spike can't skip the ladder.
+//  (4) top coefficient ≤ 1.09 (AdvCap's >1.10 = guaranteed wall).
 export const PAGE_SLOTS: PageSlotDef[] = [
   {
     id: 'comment_spam',
@@ -216,10 +221,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'Listicle Blog',
     platform: 'google',
     baseCost: 60,
-    baseCycleSec: 2.0,
-    costCoef: 1.07,
-    baseE: 21_000,
-    unlock: { cash: 50 },
+    baseCycleSec: 3.0,
+    costCoef: 1.14,
+    baseE: 22_500,
+    unlock: { cash: 200 },
     flavor: '"10 things experts won\'t tell you about" — actual experts unconsulted.',
   },
   {
@@ -227,10 +232,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'Recipe Page',
     platform: 'google',
     baseCost: 720,
-    baseCycleSec: 4.0,
-    costCoef: 1.08,
-    baseE: 700_000,
-    unlock: { cash: 500 },
+    baseCycleSec: 6.0,
+    costCoef: 1.13,
+    baseE: 540_000,
+    unlock: { cash: 5_000, lifetimeE: 500_000_000 },
     flavor: '3,000-word personal essay before the recipe. The essay is also fake.',
   },
   {
@@ -238,10 +243,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'Facebook Page',
     platform: 'facebook',
     baseCost: 8_640,
-    baseCycleSec: 8.0,
-    costCoef: 1.08,
-    baseE: 19_000_000,
-    unlock: { cash: 6_000 },
+    baseCycleSec: 12.0,
+    costCoef: 1.12,
+    baseE: 10_400_000,
+    unlock: { cash: 250_000, lifetimeE: 20_000_000_000 },
     flavor: 'Boomers, here.',
   },
   {
@@ -249,10 +254,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'Amazon Storefront',
     platform: 'amazon',
     baseCost: 103_680,
-    baseCycleSec: 16.0,
-    costCoef: 1.09,
-    baseE: 530_000_000,
-    unlock: { cash: 75_000 },
+    baseCycleSec: 24.0,
+    costCoef: 1.11,
+    baseE: 207_000_000,
+    unlock: { cash: 15_000_000, lifetimeE: 800_000_000_000 },
     flavor: '3 uploads/day per account. Buy more accounts.',
   },
   {
@@ -260,10 +265,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'TikTok Account',
     platform: 'tiktok',
     baseCost: 1_240_000,
-    baseCycleSec: 45.0,
-    costCoef: 1.09,
-    baseE: 75_000_000_000,
-    unlock: { cash: 800_000 },
+    baseCycleSec: 96.0,
+    costCoef: 1.10,
+    baseE: 30_000_000_000,
+    unlock: { cash: 1_000_000_000, lifetimeE: 20_000_000_000_000 },
     flavor: 'AI voiceover reading r/AmITheAsshole over 8 hours of Subway Surfers.',
   },
   {
@@ -271,10 +276,10 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     name: 'LinkedIn Page',
     platform: 'linkedin',
     baseCost: 14_900_000,
-    baseCycleSec: 120.0,
-    costCoef: 1.10,
-    baseE: 1_500_000_000_000,
-    unlock: { cash: 10_000_000 },
+    baseCycleSec: 384.0,
+    costCoef: 1.09,
+    baseE: 640_000_000_000,
+    unlock: { cash: 80_000_000_000, lifetimeE: 500_000_000_000_000 },
     flavor: 'Thought leadership. The leader is a bot. The thought is a Gumroad funnel.',
   },
 ]

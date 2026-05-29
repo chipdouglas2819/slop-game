@@ -13,10 +13,9 @@ import type {
   Recipe,
   TopicId,
 } from './types'
-import { MODEL_CYCLE_COST, PAGE_SLOT_BY_ID, PLATFORMS, TOPICS } from './data'
+import { PAGE_SLOT_BY_ID, TOPICS } from './data'
 import {
-  botEMult,
-  effectiveCPM,
+  cyclePayout,
   effectiveCycleSec,
   recipeKey,
   saturationMult,
@@ -24,20 +23,13 @@ import {
   trendDirection,
 } from './math'
 
-// Local page $/sec (net of model burn). Duplicated from state.ts's selector to
-// avoid a circular import (state.ts imports the scandal engine).
+// Net page $/sec via the single shared production formula.
 function pageDps(state: GameState, pageIdx: number): number {
   const p = state.pages[pageIdx]
   if (!p || p.units <= 0) return 0
-  const slot = PAGE_SLOT_BY_ID[p.defId]
-  const score = slopScore(state, p.recipe).total
-  const cycleSec = effectiveCycleSec(slot, p.units)
-  const E = slot.baseE * p.units * score * botEMult(p.bots)
-  const cpmGeo = p.recipe.tactic === 'geo_boomers' ? 1.5 : 1.0
-  const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, p.bots)
-  const dollars = (E / 1000) * cpm
-  const modelCost = MODEL_CYCLE_COST[p.recipe.model] * p.units
-  return dollars / cycleSec - modelCost / cycleSec
+  const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
+  const oc = cyclePayout(state, p)
+  return (oc.dollars - oc.modelCost) / cycleSec
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -131,9 +123,15 @@ const SYSTEMIC_HEADLINES = [
 const SATURATION_TRIGGER = 0.5 // below this multiplier = "over-pushed"
 const ARM_CHANCE_PER_SEC = 0.012 // organic; combined with the cooldown gives
 const SCANDAL_COOLDOWN_MS = 120_000 // roughly one scandal every few minutes
+const SCANDAL_UNLOCK_LIFETIME_E = 5_000_000 // present in session 1, not instant
 
 export function scandalsUnlocked(state: GameState): boolean {
-  return state.progression.tacticChipUnlocked // unlocks at first prestige
+  // Decoupled from prestige (which now lands ~45-90 min): once you have a
+  // manager running and some volume, an over-pushed niche can Go Mainstream.
+  return (
+    state.progression.firstManagerBought &&
+    state.lifetimeE.gte(SCANDAL_UNLOCK_LIFETIME_E)
+  )
 }
 
 export function maybeArmScandal(state: GameState, dtSec: number): ActiveScandal | null {
