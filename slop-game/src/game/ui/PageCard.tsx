@@ -1,33 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import {
-  PAGE_SLOT_BY_ID,
-  MODELS,
-  MODEL_CYCLE_COST,
-  MILESTONES,
-  TOPICS,
-  TACTICS,
-  PLATFORMS,
-  managerCost,
-} from '../engine/data'
+import { PAGE_SLOT_BY_ID, MILESTONES, TOPICS, PLATFORMS, managerCost } from '../engine/data'
 import {
   effectiveCycleSec,
-  era,
   maxBuyable,
   nextMilestone,
-  pageBotShare,
   recipeKey,
+  trendDirection,
   unitCost,
   SATURATION_OVERUSED_BELOW,
   saturationMult,
 } from '../engine/math'
 import { pageDollarsPerSec, pageTapPayout } from '../engine/state'
 import { fmtMoney, fmtSeconds } from '../format'
-import { FactorStrip } from './FactorStrip'
-import { ChipPicker } from './ChipPicker'
+import { TuneSheet } from './TuneSheet'
 import { sfx } from './sfx'
 import Decimal from 'break_infinity.js'
-import type { ModelId, PlatformId, TacticId, TopicId } from '../engine/types'
+import type { PlatformId } from '../engine/types'
 
 interface Float {
   id: number
@@ -38,13 +27,19 @@ interface Float {
 let floatId = 0
 
 export function PageCard({ pageIdx }: { pageIdx: number }) {
-  const { state, dispatch } = useStore()
+  const { state } = useStore()
   const page = state.pages[pageIdx]
   const slot = PAGE_SLOT_BY_ID[page.defId]
-  const [picker, setPicker] = useState<'model' | 'topic' | 'tactic' | null>(null)
+  const [tuneOpen, setTuneOpen] = useState(false)
 
   // Collapsed by default once a manager runs the page; manual pages stay open.
-  const [expanded, setExpanded] = useState(!page.manager || page.units === 0)
+  // While the first-retune spotlight is active, stay open — collapsing would
+  // hide the exact glowing button the teaching hint points at.
+  const [expanded, setExpanded] = useState(
+    !page.manager ||
+      page.units === 0 ||
+      (state.progression.topicChipUnlocked && !state.progression.firstRetuneDone),
+  )
   const [celebration, setCelebration] = useState<string | null>(null)
   const [rateFlash, setRateFlash] = useState<string | null>(null)
   const [floats, setFloats] = useState<Float[]>([])
@@ -58,15 +53,14 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   const milestone = nextMilestone(page.units)
   const cycleInFlight = page.cycleProgress > 0
   const canTap = page.units > 0 && !page.manager && !cycleInFlight
-  const modelCostPerPost = MODEL_CYCLE_COST[page.recipe.model] * page.units
   const losingMoney = page.manager && dpsManager < 0
   const liveRate = page.manager ? dpsManager : tapPayout.dollars - tapPayout.modelCost
-  const gameEra = era(state)
+  const isHot = trendDirection(page.recipe, state.trend) === 'hot'
   const underCrackdown =
     state.crackdown != null &&
     state.crackdown.platform === slot.platform &&
     state.lastTickAt < state.crackdown.untilMs
-  const spotlightTopic = chipsUnlocked && !state.progression.firstRetuneDone
+  const spotlightTune = chipsUnlocked && !state.progression.firstRetuneDone
 
   // ── Juice detectors ─────────────────────────────────────────────────────
   const prevUnits = useRef(page.units)
@@ -93,8 +87,8 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   }, [page.units])
 
   // Manager hired → chime + overlay + auto-collapse into glance mode.
-  // EXCEPT the very first manager: the hint is about to say "tap the Topic
-  // chip" — collapsing the card would hide the exact thing it points at.
+  // EXCEPT the very first manager: the hint is about to say "tap the Tune
+  // button" — collapsing the card would hide the exact thing it points at.
   useEffect(() => {
     if (page.manager && !prevManager.current) {
       celebrate('🧑‍💼 Manager hired — this page now runs itself.')
@@ -149,49 +143,47 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
     setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 1200)
   }
 
-  // ── Collapsed glance row ────────────────────────────────────────────────
-  const header = (
-    <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 pt-3 pb-2">
-      <div className="flex items-center gap-3">
-        <PlatformAvatar id={slot.platform} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
-              {PLATFORMS[slot.platform].name}
-            </span>
-            {page.units > 0 && <span className="text-zinc-500 text-xs shrink-0">×{page.units}</span>}
-            {isBurning && chipsUnlocked && page.units > 0 && (
-              <span className="text-orange-400 text-[10px] shrink-0">⚠ overused</span>
-            )}
-            {underCrackdown && (
-              <span className="text-cyan-300 text-[10px] shrink-0">🚨 crackdown</span>
-            )}
-            <span className="ml-auto" />
-            {page.units > 0 && (
-              <span className={`font-mono text-sm font-semibold shrink-0 ${losingMoney ? 'text-red-400' : 'text-emerald-300'}`}>
-                {page.manager ? `${fmtMoney(dpsManager)}/s` : `${fmtMoney(liveRate)}/post`}
-              </span>
-            )}
-            <span className="text-zinc-500 text-xs shrink-0">{expanded ? '▴' : '▾'}</span>
-          </div>
-          <div className="text-zinc-100 font-medium truncate leading-tight">{slot.name}</div>
-          <div className="text-xs text-zinc-500 truncate italic mt-0.5">
-            {page.units === 0
-              ? slot.flavor ?? 'A blank page.'
-              : chipsUnlocked
-              ? `posting: ${TOPICS[page.recipe.topic].name}`
-              : 'tap to publish'}
-          </div>
-        </div>
-      </div>
-    </button>
-  )
-
   return (
     <div className="relative bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
-      {header}
+      {/* HEADER — the collapsed glance row */}
+      <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 pt-3 pb-2">
+        <div className="flex items-center gap-3">
+          <PlatformAvatar id={slot.platform} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[9px] uppercase tracking-wider text-zinc-500 shrink-0">
+                {PLATFORMS[slot.platform].name}
+              </span>
+              {page.units > 0 && <span className="text-zinc-500 text-xs shrink-0">×{page.units}</span>}
+              {isBurning && chipsUnlocked && page.units > 0 && (
+                <span className="text-orange-400 text-[10px] shrink-0">⚠ overused</span>
+              )}
+              {underCrackdown && (
+                <span className="text-cyan-300 text-[10px] shrink-0">🚨 crackdown</span>
+              )}
+              <span className="ml-auto" />
+              {page.units > 0 && (
+                <span
+                  className={`font-mono text-sm font-semibold shrink-0 ${losingMoney ? 'text-red-400' : 'text-emerald-300'}`}
+                >
+                  {page.manager ? `${fmtMoney(dpsManager)}/s` : `${fmtMoney(liveRate)}/post`}
+                </span>
+              )}
+              <span className="text-zinc-500 text-xs shrink-0">{expanded ? '▴' : '▾'}</span>
+            </div>
+            <div className="text-zinc-100 font-medium truncate leading-tight">{slot.name}</div>
+            <div className="text-xs text-zinc-500 truncate italic mt-0.5">
+              {page.units === 0
+                ? slot.flavor ?? 'A blank page.'
+                : chipsUnlocked
+                ? `posting: ${TOPICS[page.recipe.topic].name}`
+                : 'tap to publish'}
+            </div>
+          </div>
+        </div>
+      </button>
 
-      {/* Thin production bar — always visible so the pulse never disappears */}
+      {/* Thin production bar — the pulse never disappears */}
       {page.units > 0 && page.manager && (
         <div className="px-4 pb-2">
           <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
@@ -205,21 +197,31 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
 
       {expanded && (
         <>
-          {/* CHIPS — hidden until first manager bought (§5 Era I roll-out) */}
+          {/* ONE tuning entry point — everything recipe-related lives in the sheet */}
           {chipsUnlocked && page.units > 0 && (
-            <div className="px-4 pb-2 flex flex-wrap gap-2">
-              <Chip
-                label="Topic"
-                value={TOPICS[page.recipe.topic].name}
-                onClick={() => { sfx('uiOpen'); setPicker('topic') }}
-                spotlight={spotlightTopic}
-              />
-              {state.progression.tacticChipUnlocked && (
-                <Chip label="Tactic" value={TACTICS[page.recipe.tactic].name} onClick={() => { sfx('uiOpen'); setPicker('tactic') }} />
-              )}
-              {state.progression.modelChipUnlocked && (
-                <Chip label="Model" value={MODELS[page.recipe.model].name} onClick={() => { sfx('uiOpen'); setPicker('model') }} />
-              )}
+            <div className="px-4 pb-2">
+              <button
+                onClick={() => { sfx('uiOpen'); setTuneOpen(true) }}
+                className={`w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left ${
+                  spotlightTune
+                    ? 'border-fuchsia-400 ring-2 ring-fuchsia-500/60 animate-pulse bg-fuchsia-950/40'
+                    : 'border-zinc-700 bg-zinc-800/60 hover:bg-zinc-700/70'
+                }`}
+              >
+                <span className="min-w-0">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-500 block leading-none">
+                    ⚙ Tune this page
+                  </span>
+                  <span className="text-sm text-zinc-100 truncate block mt-0.5">
+                    {TOPICS[page.recipe.topic].name}
+                  </span>
+                </span>
+                <span className="shrink-0 flex items-center gap-1.5 text-xs">
+                  {isHot && <span title="Matches a hot trend">🔥</span>}
+                  {isBurning && <span title="Overused — switch it up">⚠</span>}
+                  <span className="text-zinc-500">›</span>
+                </span>
+              </button>
             </div>
           )}
 
@@ -236,6 +238,9 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
                   earns {fmtMoney(tapPayout.dollars - tapPayout.modelCost)} per post
                 </span>
               )}
+              {losingMoney && (
+                <span className="text-red-400 text-[11px]">⚠ model costs more than it earns</span>
+              )}
               {rateFlash && (
                 <span
                   className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded animate-[flashPop_300ms_ease-out] ${
@@ -245,63 +250,6 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
                   {rateFlash}
                 </span>
               )}
-            </div>
-          )}
-
-          {/* MODEL RUNNING COST */}
-          {page.units > 0 && modelCostPerPost > 0 && (
-            <div className="px-4 pb-2 text-[11px]">
-              {losingMoney ? (
-                <span className="text-red-400">
-                  ⚠ {MODELS[page.recipe.model].name} costs more to run than it earns — switch to a cheaper
-                  model or grow this page.
-                </span>
-              ) : (
-                <span className="text-zinc-500">
-                  running {MODELS[page.recipe.model].name}: −{fmtMoney(MODEL_CYCLE_COST[page.recipe.model])}/post
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* FACTOR STRIP */}
-          {chipsUnlocked && page.units > 0 && (
-            <div className="px-4 pb-3">
-              <FactorStrip recipe={page.recipe} />
-            </div>
-          )}
-
-          {/* BOTS — Era II's tradeoff: more fake views (→ faster unlocks,
-              tokens, Zombie progress) for less money per view */}
-          {gameEra >= 2 && page.units > 0 && page.manager && (
-            <div className="px-4 pb-3">
-              <div className="bg-zinc-800/40 rounded-lg px-3 py-2">
-                <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-zinc-400">🤖 Fake views (bots)</span>
-                  <span className="text-zinc-200 font-mono">{Math.round(page.bots * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(page.bots * 100)}
-                  onChange={(e) =>
-                    dispatch({ type: 'SET_BOTS', pageIdx, fraction: Number(e.target.value) / 100 })
-                  }
-                  className="w-full accent-cyan-500"
-                />
-                <div className="text-[10px] text-zinc-500 mt-0.5 leading-snug">
-                  views ×{(1 + 4 * page.bots).toFixed(1)} · pay per view −
-                  {Math.round(50 * page.bots)}% · {Math.round(pageBotShare(page.bots) * 100)}% of
-                  this page is bots. Bots speed up unlocks & Tokens — and feed the 🧟 meter.
-                </div>
-                {underCrackdown && (
-                  <div className="mt-1.5 text-[11px] text-cyan-300 bg-cyan-950/50 border border-cyan-800 rounded px-2 py-1">
-                    🚨 {PLATFORMS[slot.platform].name} is purging bots — your fake views do
-                    nothing here right now (the CPM hit stays).
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
@@ -356,48 +304,8 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
         </div>
       )}
 
-      {picker && (
-        <ChipPicker
-          axis={picker}
-          recipe={page.recipe}
-          onPick={(v) =>
-            dispatch({
-              type: 'RETUNE',
-              pageIdx,
-              axis: picker,
-              value: v as ModelId | TopicId | TacticId,
-            })
-          }
-          onClose={() => setPicker(null)}
-        />
-      )}
+      {tuneOpen && <TuneSheet pageIdx={pageIdx} onClose={() => setTuneOpen(false)} />}
     </div>
-  )
-}
-
-function Chip({
-  label,
-  value,
-  onClick,
-  spotlight,
-}: {
-  label: string
-  value: string
-  onClick: () => void
-  spotlight?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-xs bg-zinc-800/80 hover:bg-zinc-700 border rounded-lg px-2.5 py-1.5 flex flex-col items-start ${
-        spotlight
-          ? 'border-fuchsia-400 ring-2 ring-fuchsia-500/60 animate-pulse' // first-retune spotlight
-          : 'border-zinc-700'
-      }`}
-    >
-      <span className="text-[10px] uppercase text-zinc-500 tracking-wider leading-none">{label}</span>
-      <span className="text-zinc-100 leading-tight mt-0.5">{value}</span>
-    </button>
   )
 }
 

@@ -40,61 +40,63 @@ export const BAND_LABEL: Record<Band, string> = {
 // Models (§4.2)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Parody tool names (no real brands — D12) that read funny cold; the flavor
+// line is the joke a stranger gets in one beat.
 export const MODELS: Record<ModelId, ModelDef> = {
   free_image: {
     id: 'free_image',
-    name: 'Free MS Image Creator',
+    name: 'Free ImageBot',
     tier: 1.0,
     // No trend tags: the baseline model everyone runs must not make every
     // recipe read "🔥 trending" whenever ai_aesthetic is hot — that polluted
     // the topic picker into showing the same bonus on every option. Paid
     // models keep their tags (riding a trend is part of what you pay for).
     tags: [],
-    flavor: "It's free, that's the whole pitch.",
+    flavor: "It's free. That's the whole pitch.",
   },
   gumroad_pack: {
     id: 'gumroad_pack',
-    name: 'Gumroad Prompt Pack',
+    name: '$99 Prompt Pack',
     tier: 1.4,
     tags: ['ai_aesthetic', 'money'],
     unlock: { cash: 1000 },
-    flavor: 'Buy the course that teaches the course.',
+    flavor: 'Buy the course that teaches you to sell the course.',
   },
   midjourney: {
     id: 'midjourney',
-    name: 'Midjourney Sub',
+    name: 'ArtSlop Pro',
     tier: 2.2,
     tags: ['ai_aesthetic', 'religion'],
     unlock: { cash: 50_000 },
-    flavor: 'WRITE ME 10 PROMPT picture OF JESUS…',
+    flavor: 'Subscription art. Cancel anytime. Nobody cancels.',
   },
   tts_rig: {
     id: 'tts_rig',
-    name: 'Stock-Voice / TTS Rig',
+    name: 'RoboVoice Rig',
     tier: 2.0,
     tags: ['ai_aesthetic', 'parasocial'],
     unlock: { cash: 80_000 },
-    flavor: 'AI voiceover reading r/AITA.',
+    flavor: 'A tireless voice that reads the internet out loud.',
   },
   video_gen: {
     id: 'video_gen',
-    name: 'Video Gen',
+    name: 'VidSlop Studio',
     tier: 4.0,
     tags: ['ai_aesthetic', 'kids'],
     unlock: { cash: 5_000_000 },
-    flavor: 'Cursed CGI, the Cocomelon cousin.',
+    flavor: 'Cursed CGI, straight to the children.',
   },
   deepfake: {
     id: 'deepfake',
-    name: 'Deepfake / Sora-grade',
+    name: 'DeepFaker Max',
     tier: 7.5,
     tags: ['ai_aesthetic', 'sex'],
     unlock: { cash: 200_000_000 },
-    flavor: 'our GPUs are melting.',
+    flavor: 'So realistic it should be illegal. (Increasingly, it is.)',
   },
   agi: {
     id: 'agi',
-    name: 'Custom AGI',
+    name: 'Homebrew AGI',
     tier: 15,
     tags: ['ai_aesthetic'],
     unlock: { cash: 1e12 },
@@ -119,30 +121,35 @@ export const MODEL_CYCLE_COST: Record<ModelId, number> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TOPICS: Record<TopicId, TopicDef> = {
-  shrimp_jesus: { id: 'shrimp_jesus', name: 'Shrimp / Fruit Jesus', tags: ['religion', 'ai_aesthetic'], flavor: 'Surreal AI religious images for the faithful' },
-  africa_boys: { id: 'africa_boys', name: '"Africa Boys" Sculpture', tags: ['wholesome', 'parasocial', 'ai_aesthetic'], flavor: 'Fake "made it with my own hands!" art' },
-  sob_bait: { id: 'sob_bait', name: 'Disaster Sob-Bait', tags: ['fear', 'rage', 'parasocial'], flavor: 'Tearjerker disaster photos that beg for likes' },
-  mushroom_guide: { id: 'mushroom_guide', name: 'Mushroom Foraging Guide', tags: ['wholesome', 'food', 'fear'], flavor: 'AI foraging book that misidentifies the deadly ones' },
-  fake_memoir: { id: 'fake_memoir', name: 'Fake Memoir of Real Author', tags: ['parasocial', 'money'], flavor: 'A book a real author never wrote, timed to their launch' },
-  lofi: { id: 'lofi', name: 'Lo-Fi / Ambient', tags: ['nostalgia', 'wholesome'], flavor: 'Endless ghost-artist chill beats' },
-  finger_family: { id: 'finger_family', name: 'Finger-Family / Nursery', tags: ['kids', 'nostalgia'], flavor: 'Cursed nursery-rhyme videos for toddlers' },
-  glue_pizza: { id: 'glue_pizza', name: 'Glue-Pizza / Eat-A-Rock', tags: ['food', 'ai_aesthetic'], flavor: 'AI "life hacks" that are actively dangerous' },
-  recipe_mill: { id: 'recipe_mill', name: 'Recipe Mill', tags: ['food'], flavor: 'SEO recipe pages buried under a fake life story' },
-  agree_fable: { id: 'agree_fable', name: '"Agree?" Inspirational Fable', tags: ['wholesome', 'parasocial', 'money'], flavor: 'LinkedIn parables that funnel to a course' },
+  // Names must land COLD (no 2024-internet homework required); the subtitle
+  // carries the joke in plain words. IDs are stable for save-compat.
+  shrimp_jesus: { id: 'shrimp_jesus', name: 'Shrimp Jesus', tags: ['religion', 'ai_aesthetic'], flavor: 'Surreal AI Jesus pics — half savior, half seafood. The comments say Amen.' },
+  africa_boys: { id: 'africa_boys', name: '"Made It Myself!" Crafts', tags: ['wholesome', 'parasocial', 'ai_aesthetic'], flavor: 'AI "handmade" sculptures fishing for proud-of-you likes' },
+  sob_bait: { id: 'sob_bait', name: 'Disaster Sob-Bait', tags: ['fear', 'rage', 'parasocial'], flavor: 'Tearjerker tragedy pics that beg strangers for likes' },
+  mushroom_guide: { id: 'mushroom_guide', name: 'Mushroom Foraging Guide', tags: ['wholesome', 'food', 'fear'], flavor: "An AI nature book that can't tell dinner from deadly" },
+  fake_memoir: { id: 'fake_memoir', name: 'Fake Celebrity Memoir', tags: ['parasocial', 'money'], flavor: 'A book the author never wrote, timed to their real launch' },
+  lofi: { id: 'lofi', name: 'Endless Chill Beats', tags: ['nostalgia', 'wholesome'], flavor: 'Robot lo-fi flooding the playlists, a penny at a time' },
+  finger_family: { id: 'finger_family', name: "Cursed Kids' Cartoons", tags: ['kids', 'nostalgia'], flavor: 'Algorithm-bait nursery videos that get weirder every episode' },
+  glue_pizza: { id: 'glue_pizza', name: 'Eat-a-Rock Life Hacks', tags: ['food', 'ai_aesthetic'], flavor: '"Health tips" no human checked: glue on pizza, a daily rock' },
+  recipe_mill: { id: 'recipe_mill', name: 'Recipe Mill', tags: ['food'], flavor: 'A 3,000-word life story burying a recipe nobody cooked' },
+  agree_fable: { id: 'agree_fable', name: '"Agree?" Hustle Fables', tags: ['wholesome', 'parasocial', 'money'], flavor: 'Fake humble stories that end in a course funnel' },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Platforms (§4.3 + §8 CPM)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Platform identities ship as TRANSPARENT PARODIES (D12) — legally safer in a
+// game about fraud, and funnier. Real names survive only in editorial content
+// (achievement hints, signature-scandal references = protected commentary).
 export const PLATFORMS: Record<PlatformId, PlatformDef> = {
-  facebook: { id: 'facebook', name: 'Facebook', shortName: 'FB', cpm: 1.0, tags: ['parasocial', 'money'] },
-  amazon: { id: 'amazon', name: 'Amazon', shortName: 'Amz', cpm: 1.2, tags: ['money'] },
-  spotify: { id: 'spotify', name: 'Spotify', shortName: 'Spt', cpm: 0.3, tags: ['nostalgia'] },
-  yt_kids: { id: 'yt_kids', name: 'YouTube Kids', shortName: 'YTK', cpm: 0.6, tags: ['kids'] },
-  google: { id: 'google', name: 'Google', shortName: 'Goog', cpm: 0.8, tags: ['money', 'food'] },
-  tiktok: { id: 'tiktok', name: 'TikTok', shortName: 'TT', cpm: 0.4, tags: ['rage', 'sex'] },
-  linkedin: { id: 'linkedin', name: 'LinkedIn', shortName: 'LI', cpm: 0.9, tags: ['money', 'parasocial'] },
+  facebook: { id: 'facebook', name: 'Fakebook', shortName: 'FB', cpm: 1.0, tags: ['parasocial', 'money'] },
+  amazon: { id: 'amazon', name: 'Amazoom', shortName: 'AZ', cpm: 1.2, tags: ['money'] },
+  spotify: { id: 'spotify', name: 'Spotifake', shortName: 'SF', cpm: 0.3, tags: ['nostalgia'] },
+  yt_kids: { id: 'yt_kids', name: 'KidsTube', shortName: 'KT', cpm: 0.6, tags: ['kids'] },
+  google: { id: 'google', name: 'Goggle', shortName: 'GG', cpm: 0.8, tags: ['money', 'food'] },
+  tiktok: { id: 'tiktok', name: 'ClickClock', shortName: 'CC', cpm: 0.4, tags: ['rage', 'sex'] },
+  linkedin: { id: 'linkedin', name: 'WorkedIn', shortName: 'WI', cpm: 0.9, tags: ['money', 'parasocial'] },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,7 +238,7 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     costCoef: 1.14,
     baseE: 22_500,
     unlock: { cash: 200 },
-    flavor: '"10 things experts won\'t tell you about" — actual experts unconsulted.',
+    flavor: '"10 Things Experts Won\'t Tell You" — no experts were consulted.',
   },
   {
     id: 'recipe_page',
@@ -242,51 +249,51 @@ export const PAGE_SLOTS: PageSlotDef[] = [
     costCoef: 1.13,
     baseE: 540_000,
     unlock: { cash: 5_000, lifetimeE: 500_000_000 },
-    flavor: '3,000-word personal essay before the recipe. The essay is also fake.',
+    flavor: 'A heartfelt essay before every recipe. The heart is fake too.',
   },
   {
     id: 'facebook_page',
-    name: 'Facebook Page',
+    name: 'Fakebook Page',
     platform: 'facebook',
     baseCost: 8_640,
     baseCycleSec: 12.0,
     costCoef: 1.12,
     baseE: 10_400_000,
     unlock: { cash: 250_000, lifetimeE: 20_000_000_000 },
-    flavor: 'Boomers, here.',
+    flavor: 'Your aunt already follows it.',
   },
   {
     id: 'amazon_storefront',
-    name: 'Amazon Storefront',
+    name: 'Amazoom Storefront',
     platform: 'amazon',
     baseCost: 103_680,
     baseCycleSec: 24.0,
     costCoef: 1.11,
     baseE: 207_000_000,
     unlock: { cash: 15_000_000, lifetimeE: 800_000_000_000 },
-    flavor: '3 uploads/day per account. Buy more accounts.',
+    flavor: 'Three AI books a day per account. So: buy more accounts.',
   },
   {
     id: 'tiktok_account',
-    name: 'TikTok Account',
+    name: 'ClickClock Account',
     platform: 'tiktok',
     baseCost: 1_240_000,
     baseCycleSec: 96.0,
     costCoef: 1.10,
     baseE: 30_000_000_000,
     unlock: { cash: 1_000_000_000, lifetimeE: 20_000_000_000_000 },
-    flavor: 'AI voiceover reading r/AmITheAsshole over 8 hours of Subway Surfers.',
+    flavor: 'A robot voice reads internet drama over endless gameplay footage.',
   },
   {
     id: 'linkedin_page',
-    name: 'LinkedIn Page',
+    name: 'WorkedIn Page',
     platform: 'linkedin',
     baseCost: 14_900_000,
     baseCycleSec: 384.0,
     costCoef: 1.09,
     baseE: 640_000_000_000,
     unlock: { cash: 80_000_000_000, lifetimeE: 500_000_000_000_000 },
-    flavor: 'Thought leadership. The leader is a bot. The thought is a Gumroad funnel.',
+    flavor: 'Thought leadership by a bot, for bots, about hustle.',
   },
 ]
 
@@ -355,20 +362,23 @@ export const GEO_US_BOOMER_E_MULT = 1.0
 // Phase 1 achievements (~10, verbatim titles, §13)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Titles are verbatim quotes from real incidents (the collectible); the hint
+// tells a stranger the true story in one line — "this actually happened" IS
+// the joke, so say so.
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: 'eat_a_rock', title: 'Eat at Least One Small Rock Per Day', hint: 'Google AI Overview, laundered from The Onion.' },
-  { id: 'glue_pizza', title: 'Add 1/8 Cup Non-Toxic Glue', hint: 'A Reddit shitpost, 11 years aged into search-result canon.' },
-  { id: 'train_leaves', title: 'Train Made of Leaves: $431', hint: 'A single image payout, screenshotted into a brag.' },
-  { id: 'hundred_likes', title: '$100 for 1,000 Likes', hint: 'The slop-tutorial pitch.' },
-  { id: 'tidewater', title: 'Tidewater Dreams', hint: "Isabel Allende's nonexistent novel." },
-  { id: 'india_emotional', title: 'The Indian Audience Is Very Emotional', hint: '"…so you too should create a page like this."' },
-  { id: 'write_me_10', title: 'WRITE ME 10 PROMPT', hint: 'A real creator\'s Midjourney prompt.' },
-  { id: 'separate_legal_entity', title: 'A Separate Legal Entity', hint: 'Damage-control a scandal — blame deflected.' },
-  { id: 'gpus_melting', title: 'Our GPUs Are Melting', hint: 'The Ghibli Flood.' },
+  { id: 'eat_a_rock', title: 'Eat at Least One Small Rock Per Day', hint: "Really happened: Google's AI gave this health advice — it learned it from a joke site." },
+  { id: 'glue_pizza', title: 'Add 1/8 Cup Non-Toxic Glue', hint: "Really happened: Google's AI suggested glue on pizza, from a decade-old Reddit gag." },
+  { id: 'train_leaves', title: 'Train Made of Leaves: $431', hint: 'Really happened: a slop farmer bragged about earning $431 from one AI image.' },
+  { id: 'hundred_likes', title: '$100 for 1,000 Likes', hint: 'Really happened: that\'s the going rate in real "get rich with AI pages" courses.' },
+  { id: 'tidewater', title: 'Tidewater Dreams', hint: 'Really happened: AI books appeared under a famous author\'s name — for a novel she never wrote.' },
+  { id: 'india_emotional', title: 'The Indian Audience Is Very Emotional', hint: 'Really happened: verbatim from a real slop tutorial on farming engagement abroad.' },
+  { id: 'write_me_10', title: 'WRITE ME 10 PROMPT', hint: 'Really happened: a real creator\'s prompt — "WRITE ME 10 PROMPT picture OF JESUS…"' },
+  { id: 'separate_legal_entity', title: 'A Separate Legal Entity', hint: 'Really happened: an airline argued in court that its own chatbot was a separate legal entity. It lost.' },
+  { id: 'gpus_melting', title: 'Our GPUs Are Melting', hint: 'Really happened: when AI anime portraits flooded the internet, the CEO bragged the servers were cooking.' },
   { id: 'first_prestige', title: 'You Survived An Algorithm Change', hint: 'And the Algorithm sold the survival back to you as progress.' },
   // Scandal achievements (§7 / §13)
-  { id: 'remarkable_submission', title: 'This Is a Remarkable Submission', hint: 'The tribunal judge, to Air Canada.' },
-  { id: 'gobstopper', title: 'Anti-Graffiti Gobstopper', hint: "The Wonka warehouse's magic sweet." },
+  { id: 'remarkable_submission', title: 'This Is a Remarkable Submission', hint: 'Really happened: the judge\'s reply to the airline\'s "blame the chatbot" defense.' },
+  { id: 'gobstopper', title: 'Anti-Graffiti Gobstopper', hint: 'Really happened: a $45 AI-advertised "chocolate wonderland" was an empty warehouse with one bouncy castle.' },
 ]
 
 export const ACHIEVEMENT_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

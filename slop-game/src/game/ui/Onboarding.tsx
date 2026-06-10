@@ -30,8 +30,8 @@ export function Onboarding() {
     // edge case — managers always unlock the Topic chip in BUY_MANAGER reducer
     msg = null
   } else if (!state.progression.firstRetuneDone) {
-    // stays up (with the chip spotlight-pulsing) until the first real retune
-    msg = '🔥 See "hot now" up top? Tap the glowing Topic chip and pick one that matches — it pays a bonus. Posting the same thing too long wears it out (watch "Freshness").'
+    // stays up (with the Tune button spotlight-pulsing) until the first retune
+    msg = '🔥 See "hot now" up top? Tap the glowing ⚙ Tune button and pick a topic that matches — it pays a bonus. Posting the same thing too long wears it out.'
   }
 
   if (!msg) return null

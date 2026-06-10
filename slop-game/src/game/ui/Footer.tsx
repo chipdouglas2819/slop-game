@@ -105,8 +105,9 @@ export function Footer() {
                 <HowToRow icon="🧑‍💼" title="Hire a Manager">
                   Tired of tapping Publish? Hire a Manager and the page runs itself.
                 </HowToRow>
-                <HowToRow icon="🎯" title="Topic = what you post">
-                  Tap the Topic chip and pick something that fits the page (◆ Great is best).
+                <HowToRow icon="⚙" title="Tune = what you post">
+                  Tap ⚙ Tune on a page to pick what it posts and how it's pushed (★★★ = best fit
+                  for that platform).
                 </HowToRow>
                 <HowToRow icon="🔥" title="Trending = bonus money">
                   The bar up top shows what's hot right now. Switch a page's Topic to match it

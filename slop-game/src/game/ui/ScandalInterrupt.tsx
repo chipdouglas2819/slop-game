@@ -33,6 +33,11 @@ export function ScandalInterrupt() {
       <div className="px-4 pt-3 pb-2">
         <div className="text-[10px] uppercase tracking-widest text-orange-400 font-semibold">
           ⚡ Goes Mainstream
+          {sc.signatureId && (
+            <span className="ml-2 normal-case tracking-normal text-amber-300/90 font-normal">
+              📰 based on a real incident
+            </span>
+          )}
         </div>
         <div className="text-zinc-50 font-semibold leading-snug mt-0.5">{sc.headline}</div>
         <div className="text-xs text-orange-200/80 italic mt-1">{sc.line}</div>
