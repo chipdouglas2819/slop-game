@@ -29,6 +29,7 @@ import {
   tokensAvailable,
   trendMult,
   unitCost,
+  zombieRatio,
 } from './math'
 import { rollTrend, shouldRotate } from './trend'
 import { applyAlgorithmUpdate, reshuffleAffinity } from './prestige'
@@ -210,6 +211,7 @@ function checkRetuneAchievements(
   if (axis === 'model') {
     if (value !== 'free_image') s = maybeUnlock(s, 'hundred_likes')
     if (value === 'midjourney') s = maybeUnlock(s, 'write_me_10')
+    if (value === 'video_gen') s = maybeUnlock(s, 'spaghetti') // the AI-video test
   }
   if (axis === 'tactic') {
     if (value !== DEFAULT_TACTIC[recipe.platform]) s = maybeUnlock(s, 'india_emotional')
@@ -429,6 +431,15 @@ export function reduce(state: GameState, action: Action): GameState {
         const modelCostPerSec = oc.modelCost / cycleSec
         if (dollarsPerSec >= 431) s = maybeUnlock(s, 'train_leaves')
         if (modelCostPerSec >= 1) s = maybeUnlock(s, 'gpus_melting')
+      }
+
+      // Universal-recognition achievements (mass production / dead internet)
+      if (!s.unlocked.includes('six_fingers')) {
+        const totalUnits = s.pages.reduce((n, p) => n + p.units, 0)
+        if (totalUnits >= 100) s = maybeUnlock(s, 'six_fingers')
+      }
+      if (!s.unlocked.includes('dead_internet') && zombieRatio(s) >= 0.5) {
+        s = maybeUnlock(s, 'dead_internet')
       }
 
       // Scandals (§7) — over-pushed recipe may Go Mainstream. Arm at most one.

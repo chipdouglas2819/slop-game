@@ -121,18 +121,19 @@ export const MODEL_CYCLE_COST: Record<ModelId, number> = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TOPICS: Record<TopicId, TopicDef> = {
-  // Names must land COLD (no 2024-internet homework required); the subtitle
-  // carries the joke in plain words. IDs are stable for save-compat.
-  shrimp_jesus: { id: 'shrimp_jesus', name: 'Shrimp Jesus', tags: ['religion', 'ai_aesthetic'], flavor: 'Surreal AI Jesus pics — half savior, half seafood. The comments say Amen.' },
-  africa_boys: { id: 'africa_boys', name: '"Made It Myself!" Crafts', tags: ['wholesome', 'parasocial', 'ai_aesthetic'], flavor: 'AI "handmade" sculptures fishing for proud-of-you likes' },
-  sob_bait: { id: 'sob_bait', name: 'Disaster Sob-Bait', tags: ['fear', 'rage', 'parasocial'], flavor: 'Tearjerker tragedy pics that beg strangers for likes' },
-  mushroom_guide: { id: 'mushroom_guide', name: 'Mushroom Foraging Guide', tags: ['wholesome', 'food', 'fear'], flavor: "An AI nature book that can't tell dinner from deadly" },
-  fake_memoir: { id: 'fake_memoir', name: 'Fake Celebrity Memoir', tags: ['parasocial', 'money'], flavor: 'A book the author never wrote, timed to their real launch' },
-  lofi: { id: 'lofi', name: 'Endless Chill Beats', tags: ['nostalgia', 'wholesome'], flavor: 'Robot lo-fi flooding the playlists, a penny at a time' },
-  finger_family: { id: 'finger_family', name: "Cursed Kids' Cartoons", tags: ['kids', 'nostalgia'], flavor: 'Algorithm-bait nursery videos that get weirder every episode' },
-  glue_pizza: { id: 'glue_pizza', name: 'Eat-a-Rock Life Hacks', tags: ['food', 'ai_aesthetic'], flavor: '"Health tips" no human checked: glue on pizza, a daily rock' },
-  recipe_mill: { id: 'recipe_mill', name: 'Recipe Mill', tags: ['food'], flavor: 'A 3,000-word life story burying a recipe nobody cooked' },
-  agree_fable: { id: 'agree_fable', name: '"Agree?" Hustle Fables', tags: ['wholesome', 'parasocial', 'money'], flavor: 'Fake humble stories that end in a course funnel' },
+  // ZERO meme literacy required: the NAME describes slop everyone has
+  // personally seen in their feed; the flavor line is a self-contained joke.
+  // IDs are stable for save-compat.
+  shrimp_jesus: { id: 'shrimp_jesus', name: 'AI Jesus Pics', tags: ['religion', 'ai_aesthetic'], flavor: 'Jesus, but made of shrimp. 40,000 comments say "Amen." (A real genre.)' },
+  africa_boys: { id: 'africa_boys', name: '"Look What I Made!" Posts', tags: ['wholesome', 'parasocial', 'ai_aesthetic'], flavor: 'AI "hand-carved" art. Count the fingers on those hands.' },
+  sob_bait: { id: 'sob_bait', name: 'Fake Disaster Sob Stories', tags: ['fear', 'rage', 'parasocial'], flavor: 'Tragedies that never happened, begging strangers for likes' },
+  mushroom_guide: { id: 'mushroom_guide', name: 'AI Foraging Guides', tags: ['wholesome', 'food', 'fear'], flavor: "A nature book that can't tell dinner from deadly" },
+  fake_memoir: { id: 'fake_memoir', name: 'Fake Celebrity Books', tags: ['parasocial', 'money'], flavor: 'Memoirs the celebrity discovers at their own book launch' },
+  lofi: { id: 'lofi', name: 'Robot Chill Beats', tags: ['nostalgia', 'wholesome'], flavor: '10-hour playlists by artists who have never existed' },
+  finger_family: { id: 'finger_family', name: "Creepy Kids' Videos", tags: ['kids', 'nostalgia'], flavor: 'Auto-made cartoons that get weirder the longer the robot runs' },
+  glue_pizza: { id: 'glue_pizza', name: 'AI "Life Hacks"', tags: ['food', 'ai_aesthetic'], flavor: 'Glue on your pizza. A small rock a day. Trust the computer.' },
+  recipe_mill: { id: 'recipe_mill', name: 'Recipe Spam Sites', tags: ['food'], flavor: 'A 3,000-word childhood story guarding a recipe nobody cooked' },
+  agree_fable: { id: 'agree_fable', name: 'Hustle-Bro Fables', tags: ['wholesome', 'parasocial', 'money'], flavor: 'Fake job-interview stories that end in "Agree?"' },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -379,6 +380,10 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   // Scandal achievements (§7 / §13)
   { id: 'remarkable_submission', title: 'This Is a Remarkable Submission', hint: 'Really happened: the judge\'s reply to the airline\'s "blame the chatbot" defense.' },
   { id: 'gobstopper', title: 'Anti-Graffiti Gobstopper', hint: 'Really happened: a $45 AI-advertised "chocolate wonderland" was an empty warehouse with one bouncy castle.' },
+  // Universal-recognition tier — jokes everyone gets with zero homework
+  { id: 'six_fingers', title: 'Count the Fingers', hint: 'The hands are always wrong. Nobody checks the hands. (Own 100 copies of anything.)' },
+  { id: 'spaghetti', title: 'Eating Spaghetti Convincingly', hint: 'Really happened: for years the test of AI video was whether a fake Will Smith could eat spaghetti. He could not.' },
+  { id: 'dead_internet', title: 'The Dead Internet Is You', hint: 'Really a theory: most of the internet is bots performing for bots. Half your audience is now your own bots.' },
 ]
 
 export const ACHIEVEMENT_BY_ID: Record<string, AchievementDef> = Object.fromEntries(

@@ -24,7 +24,7 @@ Math.random = mulberry32(seed)
 // Import engine AFTER patching Math.random so initial trend roll is seeded.
 const { initialState, reduce, totalDollarsPerSec, pageDollarsPerSec } = await import('../game/engine/state')
 const { decideActions } = await import('./policy')
-const { PAGE_SLOT_BY_ID } = await import('../game/engine/data')
+const { PAGE_SLOT_BY_ID, ACHIEVEMENTS } = await import('../game/engine/data')
 const { zombieRatio } = await import('../game/engine/math')
 const { fmtMoney, fmtNumber, fmtSeconds } = await import('../game/format')
 
@@ -160,5 +160,5 @@ console.log(`  weights:     ${state.modelWeights} (×${(1 + 0.1 * state.modelWei
 console.log(`  zombie Z:    ${Math.round(zombieRatio(state) * 100)}%`)
 console.log(`  scandals:    ${scandalsSeen} armed, ${scandalsResolved} resolved`)
 console.log(`  signatures:  ${state.firedSignatureScandals.length}/7 fired`)
-console.log(`  achievements:${state.unlocked.length}/${13}`)
+console.log(`  achievements:${state.unlocked.length}/${ACHIEVEMENTS.length}`)
 console.log('')

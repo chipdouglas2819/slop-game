@@ -148,6 +148,11 @@ export function Footer() {
                 <p className="text-zinc-400">
                   You are not making bad art. You are forcing it on people who never asked.
                 </p>
+                <p className="text-zinc-400">
+                  If AI junk has ruined your feed, your search results, or a working artist's
+                  career — this game is on your side. You just get to be the villain for once,
+                  and see exactly how the machine works from the inside.
+                </p>
                 <p className="text-[11px] text-zinc-600 italic">
                   Phase 1 prototype. Era II–IV, scandals, bots, and the bounded cursed coda
                   arrive in later builds.
