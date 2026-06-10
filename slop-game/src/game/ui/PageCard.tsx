@@ -84,13 +84,17 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
     prevUnits.current = page.units
   }, [page.units])
 
-  // Manager hired → chime + overlay + auto-collapse into glance mode
+  // Manager hired → chime + overlay + auto-collapse into glance mode.
+  // EXCEPT the very first manager: the hint is about to say "tap the Topic
+  // chip" — collapsing the card would hide the exact thing it points at.
   useEffect(() => {
     if (page.manager && !prevManager.current) {
       celebrate('🧑‍💼 Manager hired — this page now runs itself.')
       sfx('manager')
-      const t = setTimeout(() => setExpanded(false), 3000)
-      return () => clearTimeout(t)
+      if (state.pages.length > 1) {
+        const t = setTimeout(() => setExpanded(false), 3000)
+        return () => clearTimeout(t)
+      }
     }
     prevManager.current = page.manager
   }, [page.manager])

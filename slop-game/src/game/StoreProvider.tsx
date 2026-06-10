@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Decimal from 'break_infinity.js'
 import { reduce } from './engine/state'
@@ -43,22 +43,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id)
   }, [])
 
-  // Save loop
+  // Save loop — reads the latest state through a ref. Keying these effects on
+  // [state] tore the interval down on every 100ms tick, so the periodic save
+  // NEVER fired in an active tab (it only ever ran in throttled background
+  // tabs); a crash without a pagehide event lost the whole session.
+  const stateRef = useRef(state)
   useEffect(() => {
-    const id = setInterval(() => saveGame(state), SAVE_INTERVAL_MS)
-    return () => clearInterval(id)
+    stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    const id = setInterval(() => saveGame(stateRef.current), SAVE_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [])
 
   // Save on tab hide / pagehide for mobile reliability
   useEffect(() => {
-    const onHide = () => saveGame(state)
+    const onHide = () => saveGame(stateRef.current)
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', onHide)
     return () => {
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', onHide)
     }
-  }, [state])
+  }, [])
 
   return (
     <StoreContext.Provider

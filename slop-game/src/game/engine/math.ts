@@ -207,7 +207,10 @@ export function slopScore(state: GameState, r: Recipe): {
   const modelTier = MODELS[r.model].tier
   const aff = affinityMult(state, r)
   const tac = tacticMult(r)
-  const tr = trendMult(r, state.trend)
+  // Trend grace: before the Topic chip (and the ticker) exist, the player can
+  // neither see nor act on trend — a suppressed-tag roll silently halving the
+  // opening earnings just reads as "the game is broken". Flat 1.0 until then.
+  const tr = state.progression.topicChipUnlocked ? trendMult(r, state.trend) : 1.0
   const sat = saturationMult(state.saturation[recipeKey(r)])
   const tokens = 1 + 0.02 * state.slopTokens // soft prestige
   // ZombieBonus omitted in Phase 1 (Era II/III gate)
