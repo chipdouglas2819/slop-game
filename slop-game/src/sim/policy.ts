@@ -5,7 +5,14 @@
 import type { Action } from '../game/engine/state'
 import type { GameState, TacticId, TopicId, ModelId } from '../game/engine/types'
 import { PAGE_SLOTS, PAGE_SLOT_BY_ID, PLATFORMS, TOPICS, TACTICS, MODELS, managerCost } from '../game/engine/data'
-import { profitMult, slopScore, unitCost, tokensAvailable } from '../game/engine/math'
+import {
+  canPullPlug,
+  era,
+  profitMult,
+  slopScore,
+  unitCost,
+  tokensAvailable,
+} from '../game/engine/math'
 import { scandalHints } from '../game/engine/scandals'
 import Decimal from 'break_infinity.js'
 
@@ -96,14 +103,35 @@ export function decideActions(state: GameState): Action[] {
     spendable = spendable.minus(pick.cost)
   }
 
-  // 7) Prestige only when it's genuinely worth nuking the economy: a real
-  //    player waits until the token gain roughly DOUBLES their banked total
-  //    (≥ +100%) and they've built up for a while — not the instant a couple
-  //    tokens appear. Resetting a thriving empire for 12 tokens is a trap.
-  const gain = tokensAvailable(state.lifetimeE, state.slopTokens)
+  // 6b) Era II: run bots at a moderate level on managed pages — the player
+  //     trades cash for views/tokens/Zombie progress. Back off to 30% during a
+  //     crackdown on that platform (the re-opened decision).
+  if (era(state) >= 2) {
+    state.pages.forEach((p, i) => {
+      if (p.units <= 0 || !p.manager) return
+      const slot = PAGE_SLOT_BY_ID[p.defId]
+      const purged =
+        state.crackdown != null &&
+        state.crackdown.platform === slot.platform &&
+        state.lastTickAt < state.crackdown.untilMs
+      const target = purged ? 0.3 : 0.6
+      if (Math.abs(p.bots - target) > 0.05) {
+        actions.push({ type: 'SET_BOTS', pageIdx: i, fraction: target })
+      }
+    })
+  }
+
+  // 7) Hard prestige the moment it's available (weights compound everything);
+  //    otherwise soft-prestige only when the token gain roughly doubles the
+  //    bank — resetting a thriving empire for 12 tokens is a trap.
+  const prestigeOff = typeof process !== 'undefined' && process.env.SIM_NO_PRESTIGE === '1'
+  if (!prestigeOff && canPullPlug(state)) {
+    actions.push({ type: 'PULL_PLUG', now: state.lastTickAt })
+    return actions
+  }
+  const gain = tokensAvailable(state)
   const elapsedSec = (state.lastTickAt - state.startedAt) / 1000
   const worthIt = gain >= Math.max(40, state.slopTokens)
-  const prestigeOff = typeof process !== 'undefined' && process.env.SIM_NO_PRESTIGE === '1'
   if (!prestigeOff && worthIt && elapsedSec > 60 && state.algorithmUpdatesCompleted < 8) {
     actions.push({ type: 'PRESTIGE', now: state.lastTickAt })
   }

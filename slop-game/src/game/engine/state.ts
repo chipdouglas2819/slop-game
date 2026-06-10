@@ -14,10 +14,13 @@ import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost } from './da
 import {
   affinityMult,
   canPrestige,
+  canPullPlug,
   cyclePayout,
   effectiveCycleSec,
+  eraLifetimeE,
   maxBuyable,
   nextMilestone,
+  plugWeightsGained,
   recipeKey,
   saturationMult,
   saturationRecover,
@@ -28,7 +31,7 @@ import {
   unitCost,
 } from './math'
 import { rollTrend, shouldRotate } from './trend'
-import { applyAlgorithmUpdate } from './prestige'
+import { applyAlgorithmUpdate, reshuffleAffinity } from './prestige'
 import { maybeArmScandal, resolveScandal, ignoreScandal } from './scandals'
 import type { ScandalChoice } from './scandals'
 
@@ -101,6 +104,8 @@ const INITIAL_PROGRESSION: ProgressionState = {
   modelChipUnlocked: false,
   firstTapDone: false,
   firstManagerBought: false,
+  firstRetuneDone: false,
+  firstScandalSeen: false,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,6 +120,10 @@ export function initialState(now: number = Date.now()): GameState {
     unlockedSlots: [PAGE_SLOTS[0].id],
     slopTokens: 0,
     algorithmUpdatesCompleted: 0,
+    modelWeights: 0,
+    eraJumps: 0,
+    lifetimeEAtEraStart: new Decimal(0),
+    crackdown: null,
     affinity: structuredClone(AFFINITY_DEFAULT),
     trend: rollTrend({ legible: true, now }),
     saturation: {},
@@ -124,6 +133,7 @@ export function initialState(now: number = Date.now()): GameState {
     lastScandalResult: null,
     scandalCooldownUntil: 0,
     lastPrestigeGain: null,
+    lastEraJumpGain: null,
     monetization: {
       clout: 0,
       permanentMult: 1,
@@ -170,6 +180,8 @@ export type Action =
   | { type: 'SCANDAL_IGNORE' }
   | { type: 'CLEAR_SCANDAL_RESULT' }
   | { type: 'CLEAR_PRESTIGE_RESULT' }
+  | { type: 'PULL_PLUG'; now: number }
+  | { type: 'CLEAR_ERA_RESULT' }
   | { type: 'BUY_CLOUT'; clout: number; centsPretend: number }
   | { type: 'BUY_PERMANENT_MULT'; cloutCost: number; mult: number }
   | { type: 'WATCH_AD_BOOST'; now: number }
@@ -258,7 +270,16 @@ export function reduce(state: GameState, action: Action): GameState {
       const pages = state.pages.map((p, i) =>
         i === action.pageIdx ? { ...p, recipe } : p,
       )
-      return checkRetuneAchievements({ ...state, pages }, action.axis, action.value, recipe)
+      const progression =
+        action.axis === 'topic' && !state.progression.firstRetuneDone
+          ? { ...state.progression, firstRetuneDone: true } // ends the spotlight
+          : state.progression
+      return checkRetuneAchievements(
+        { ...state, pages, progression },
+        action.axis,
+        action.value,
+        recipe,
+      )
     }
 
     case 'BUY_MANAGER': {
@@ -416,13 +437,37 @@ export function reduce(state: GameState, action: Action): GameState {
         if (scandal) s = { ...s, activeScandal: scandal }
       }
 
+      // Platform crackdowns (D8, Era II+) — platforms periodically purge fake
+      // accounts. Voids bot view-boosts on ONE platform for 90s; re-opens the
+      // "how botted do I dare go" decision forever without new content.
+      if (s.crackdown && action.now >= s.crackdown.untilMs) {
+        s = { ...s, crackdown: null }
+      }
+      if (!s.crackdown && s.algorithmUpdatesCompleted > 0) {
+        const bottedPlatforms = s.pages
+          .filter((p) => p.units > 0 && p.bots > 0.05)
+          .map((p) => PAGE_SLOT_BY_ID[p.defId].platform)
+        if (bottedPlatforms.length > 0) {
+          const p = 1 - Math.pow(1 - 1 / 300, dt) // ~one every 5 min of botted play
+          if (Math.random() < p) {
+            const platform =
+              bottedPlatforms[Math.floor(Math.random() * bottedPlatforms.length)]
+            s = { ...s, crackdown: { platform, untilMs: action.now + 90_000 } }
+          }
+        }
+      }
+
       return s
     }
 
     case 'SCANDAL_RESOLVE': {
       if (!state.activeScandal) return state
       const { state: next, summary } = resolveScandal(state, action.choice)
-      return { ...next, lastScandalResult: summary }
+      return {
+        ...next,
+        lastScandalResult: summary,
+        progression: { ...next.progression, firstScandalSeen: true },
+      }
     }
 
     case 'SCANDAL_IGNORE': {
@@ -430,6 +475,7 @@ export function reduce(state: GameState, action: Action): GameState {
       return {
         ...ignoreScandal(state),
         lastScandalResult: 'You ignored it. The niche imploded and took half the page with it.',
+        progression: { ...state.progression, firstScandalSeen: true },
       }
     }
 
@@ -440,11 +486,12 @@ export function reduce(state: GameState, action: Action): GameState {
     case 'PRESTIGE': {
       // Enforce the same gate as the button (the sim dispatches directly).
       if (!canPrestige(state)) return state
-      const gained = tokensAvailable(state.lifetimeE, state.slopTokens)
+      const gained = tokensAvailable(state)
       const updated = applyAlgorithmUpdate(state, action.now)
       if (updated === state) return state
       let s = maybeUnlock(updated, 'first_prestige')
-      // §5 Era II — Tactic chip unlocks at the first Algorithm Update
+      // §5 Era II — Tactic chip (+ bots/Z) unlock at the first Algorithm
+      // Update. The Model chip is Era III's reward (Pull the Plug), not here.
       s = {
         ...s,
         lastPrestigeGain: gained, // powers the post-reset celebration banner
@@ -452,10 +499,42 @@ export function reduce(state: GameState, action: Action): GameState {
           ...s.progression,
           topicChipUnlocked: true, // latent-trap fix: never lose the topic chip
           tacticChipUnlocked: true,
-          modelChipUnlocked: true, // also unlock model at this beat for the prototype
         },
       }
       return s
+    }
+
+    case 'PULL_PLUG': {
+      // Hard prestige (§6) — deeper than an Algorithm Update: cash, pages AND
+      // banked Slop Tokens are wiped. In exchange: permanent Model Weights
+      // (+10% each, survive everything) and the Model axis (Era III).
+      if (!canPullPlug(state)) return state
+      const gained = plugWeightsGained(eraLifetimeE(state))
+      if (gained <= 0) return state
+      return {
+        ...state,
+        money: new Decimal(0),
+        engagements: new Decimal(0),
+        pages: state.pages.map((p) => ({ ...p, units: 0, bots: 0, cycleProgress: 0 })),
+        slopTokens: 0, // tokens are era-scoped; weights are forever
+        modelWeights: state.modelWeights + gained,
+        eraJumps: state.eraJumps + 1,
+        lifetimeEAtEraStart: state.lifetimeE, // next plug must re-earn its views
+        affinity: reshuffleAffinity(state.affinity, 0.3), // a bigger shake than soft prestige
+        saturation: {},
+        crackdown: null,
+        activeScandal: null,
+        trend: rollTrend({ legible: false, now: action.now }),
+        lastTickAt: action.now,
+        lastPrestigeGain: null,
+        lastEraJumpGain: gained,
+        progression: { ...state.progression, modelChipUnlocked: true },
+        geoMultiplier: 1.0,
+      }
+    }
+
+    case 'CLEAR_ERA_RESULT': {
+      return { ...state, lastEraJumpGain: null }
     }
 
     case 'CLEAR_PRESTIGE_RESULT': {

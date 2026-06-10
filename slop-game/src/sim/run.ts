@@ -25,6 +25,7 @@ Math.random = mulberry32(seed)
 const { initialState, reduce, totalDollarsPerSec, pageDollarsPerSec } = await import('../game/engine/state')
 const { decideActions } = await import('./policy')
 const { PAGE_SLOT_BY_ID } = await import('../game/engine/data')
+const { zombieRatio } = await import('../game/engine/math')
 const { fmtMoney, fmtNumber, fmtSeconds } = await import('../game/format')
 
 // % of total $/sec contributed by the first page (Comment Spam) — the direct
@@ -84,6 +85,8 @@ for (let i = 0; i < totalSteps; i++) {
   if (state.algorithmUpdatesCompleted >= 1) mark('first Algorithm Update (prestige)')
   if (state.algorithmUpdatesCompleted >= 2) mark('second prestige')
   if (state.progression.tacticChipUnlocked) mark('Tactic chip unlocked')
+  if (state.crackdown) mark('first platform crackdown')
+  if (state.eraJumps >= 1) mark('PULLED THE PLUG → Era III (Model chip)')
   for (const a of ['eat_a_rock', 'glue_pizza', 'train_leaves', 'first_prestige']) {
     if (state.unlocked.includes(a)) mark(`achievement: ${a}`)
   }
@@ -152,7 +155,9 @@ console.log(`  pages owned: ${state.pages.filter((p) => p.units > 0).length}`)
 console.log(`  total units: ${state.pages.reduce((n, p) => n + p.units, 0)}`)
 console.log(`  page 1 share:${firstPageSharePct(state)}% of $/sec (high = old tiers stay relevant)`)
 console.log(`  slop tokens: ${state.slopTokens}`)
-console.log(`  prestiges:   ${state.algorithmUpdatesCompleted}`)
+console.log(`  prestiges:   ${state.algorithmUpdatesCompleted} soft, ${state.eraJumps} era jumps`)
+console.log(`  weights:     ${state.modelWeights} (×${(1 + 0.1 * state.modelWeights).toFixed(1)})`)
+console.log(`  zombie Z:    ${Math.round(zombieRatio(state) * 100)}%`)
 console.log(`  scandals:    ${scandalsSeen} armed, ${scandalsResolved} resolved`)
 console.log(`  signatures:  ${state.firedSignatureScandals.length}/7 fired`)
 console.log(`  achievements:${state.unlocked.length}/${13}`)

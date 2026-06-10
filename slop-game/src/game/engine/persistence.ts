@@ -7,15 +7,31 @@ const STORAGE_KEY = 'slop.save.v1'
 interface Serialized
   extends Omit<
     GameState,
-    'money' | 'engagements' | 'lifetimeE' | 'progression' | 'pages' | 'monetization' | 'lastPrestigeGain'
+    | 'money'
+    | 'engagements'
+    | 'lifetimeE'
+    | 'progression'
+    | 'pages'
+    | 'monetization'
+    | 'lastPrestigeGain'
+    | 'lastEraJumpGain'
+    | 'modelWeights'
+    | 'eraJumps'
+    | 'crackdown'
+    | 'lifetimeEAtEraStart'
   > {
   money: string
   engagements: string
   lifetimeE: string
-  progression?: GameState['progression'] // optional — added after v1 shipped
+  lifetimeEAtEraStart?: string // optional — added after v1 shipped
+  progression?: Partial<GameState['progression']> // optional — fields accrete over versions
   pages?: GameState['pages']
   monetization?: GameState['monetization'] // optional — added after v1 shipped
   lastPrestigeGain?: number | null // optional — added after v1 shipped
+  lastEraJumpGain?: number | null // optional — added after v1 shipped
+  modelWeights?: number // optional — added after v1 shipped
+  eraJumps?: number // optional — added after v1 shipped
+  crackdown?: GameState['crackdown'] // optional — added after v1 shipped
   __version: 1
 }
 
@@ -25,6 +41,7 @@ function serialize(s: GameState): Serialized {
     money: s.money.toString(),
     engagements: s.engagements.toString(),
     lifetimeE: s.lifetimeE.toString(),
+    lifetimeEAtEraStart: s.lifetimeEAtEraStart.toString(),
     __version: 1,
   }
 }
@@ -32,15 +49,20 @@ function serialize(s: GameState): Serialized {
 function deserialize(s: Serialized): GameState {
   // Default-fill fields added after the save format was first written. Players
   // mid-session keep their progress; new fields just take their initial values.
-  const progression =
-    s.progression ?? {
-      // Old saves: if they bought a manager, treat Topic chip as unlocked.
-      topicChipUnlocked: (s.pages ?? []).some((p) => p.manager),
-      tacticChipUnlocked: (s.algorithmUpdatesCompleted ?? 0) > 0,
-      modelChipUnlocked: (s.algorithmUpdatesCompleted ?? 0) > 0,
-      firstTapDone: (s.pages ?? []).some((p) => p.units > 0),
-      firstManagerBought: (s.pages ?? []).some((p) => p.manager),
-    }
+  // Progression fields accrete over versions — default each one individually.
+  // Old saves: a bought manager implies the Topic chip; veterans already past
+  // a teaching beat skip its flag.
+  const lp = s.progression ?? {}
+  const anyManager = (s.pages ?? []).some((p) => p.manager)
+  const progression: GameState['progression'] = {
+    topicChipUnlocked: lp.topicChipUnlocked ?? anyManager,
+    tacticChipUnlocked: lp.tacticChipUnlocked ?? (s.algorithmUpdatesCompleted ?? 0) > 0,
+    modelChipUnlocked: lp.modelChipUnlocked ?? (s.eraJumps ?? 0) > 0,
+    firstTapDone: lp.firstTapDone ?? (s.pages ?? []).some((p) => p.units > 0),
+    firstManagerBought: lp.firstManagerBought ?? anyManager,
+    firstRetuneDone: lp.firstRetuneDone ?? lp.tacticChipUnlocked ?? false,
+    firstScandalSeen: lp.firstScandalSeen ?? (s.scandalCooldownUntil ?? 0) > 0,
+  }
   const pages = (s.pages ?? []).map((p) => ({
     ...p,
     cycleProgress: p.cycleProgress ?? 0,
@@ -53,7 +75,12 @@ function deserialize(s: Serialized): GameState {
     firedSignatureScandals: s.firedSignatureScandals ?? [],
     lastScandalResult: null,
     lastPrestigeGain: s.lastPrestigeGain ?? null,
+    lastEraJumpGain: s.lastEraJumpGain ?? null,
     scandalCooldownUntil: s.scandalCooldownUntil ?? 0,
+    modelWeights: s.modelWeights ?? 0,
+    eraJumps: s.eraJumps ?? 0,
+    lifetimeEAtEraStart: new Decimal(s.lifetimeEAtEraStart ?? '0'),
+    crackdown: s.crackdown ?? null,
     monetization: s.monetization ?? {
       clout: 0,
       permanentMult: 1,

@@ -137,10 +137,29 @@ const SOUNDS: Record<SfxName, Note[]> = {
   uiOpen: [{ freq: 880, at: 0, dur: 0.04, type: 'square', gain: 0.03 }],
 }
 
+// Haptic patterns paired with the bigger sounds (Android Chrome; iOS Safari
+// has no vibration API — silently skipped). Muting audio mutes these too.
+const HAPTICS: Partial<Record<SfxName, number | number[]>> = {
+  tap: 8,
+  payout: 12,
+  buy: 10,
+  milestone: [30, 40, 30, 40, 60],
+  manager: [20, 30, 40],
+  achievement: [15, 30, 15],
+  scandal: [60, 60, 60],
+  prestige: [20, 30, 40, 50, 80],
+  unlock: [15, 20, 25],
+  kaching: [10, 20, 10],
+}
+
 export function sfx(name: SfxName): void {
   try {
     play(SOUNDS[name])
+    const pattern = HAPTICS[name]
+    if (!muted && pattern && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(pattern)
+    }
   } catch {
-    // audio is never worth crashing the game over
+    // feedback is never worth crashing the game over
   }
 }

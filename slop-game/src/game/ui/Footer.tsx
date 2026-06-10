@@ -124,6 +124,15 @@ export function Footer() {
                   Push a topic too hard and it "Goes Mainstream" — a pop-up with three choices and
                   no single right answer. Read the hints and gamble.
                 </HowToRow>
+                <HowToRow icon="🤖" title="Bots (after your first reset)">
+                  Buy fake views: more views (faster unlocks &amp; Tokens) but advertisers pay less
+                  per view. Platforms crack down sometimes — stay nimble.
+                </HowToRow>
+                <HowToRow icon="🧟" title="The goal: kill the internet">
+                  The Zombie meter is the share of your views that are bots. Hit the requirements
+                  and 🔌 Pull the Plug for permanent Model Weights. Push it to 100% one day — a
+                  fully dead internet, bots watching bots — and you win.
+                </HowToRow>
               </div>
             )}
 

@@ -9,7 +9,7 @@ import { sfx } from './sfx'
 export function PrestigeSheet({ onClose }: { onClose: () => void }) {
   const { state, dispatch } = useStore()
   useLockBodyScroll()
-  const gain = tokensAvailable(state.lifetimeE, state.slopTokens)
+  const gain = tokensAvailable(state)
   const curMult = 1 + 0.02 * state.slopTokens
   const newMult = 1 + 0.02 * (state.slopTokens + gain)
 

@@ -44,7 +44,20 @@ const AXIS_HELP: Record<Axis, { title: string; help: string }> = {
 export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
   const { state } = useStore()
   useLockBodyScroll()
-  const opts = sortedOptions(axis, state, recipe)
+  const all = sortedOptions(axis, state, recipe)
+  // Each platform offers its OWN pool: poor fits are hidden outright (not just
+  // dimmed) — "Disaster Sob-Bait on Amazon" was never a real choice. The
+  // current selection always stays visible even if a reshuffle demoted it.
+  const opts =
+    axis === 'model'
+      ? all
+      : all.filter((opt) => {
+          if (opt.id === recipe[axis]) return true
+          const candidate: Recipe = { ...recipe, [axis]: opt.id }
+          const band = axis === 'tactic' ? tacticBand(candidate) : affinityBand(state, candidate)
+          return band !== 'strange'
+        })
+  const hiddenCount = all.length - opts.length
   const help = AXIS_HELP[axis]
 
   return (
@@ -144,6 +157,11 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
             )
           })}
         </ul>
+        {hiddenCount > 0 && (
+          <div className="px-4 py-2.5 text-[10px] text-zinc-600 italic">
+            {hiddenCount} poor fit{hiddenCount > 1 ? 's' : ''} for this platform hidden
+          </div>
+        )}
       </div>
     </div>
   )

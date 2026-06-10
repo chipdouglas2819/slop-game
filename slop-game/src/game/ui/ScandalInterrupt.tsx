@@ -39,6 +39,13 @@ export function ScandalInterrupt() {
         <div className="text-[11px] text-zinc-400 mt-2">
           {TOPICS[sc.topic].name} · {PLATFORMS[sc.platform].name}
         </div>
+        {!state.progression.firstScandalSeen && (
+          <div className="mt-2 text-[11px] text-orange-100/90 bg-orange-900/30 border border-orange-700/60 rounded-lg px-2.5 py-2 leading-snug">
+            <span className="font-semibold">First scandal?</span> Push a niche hard enough and it
+            blows up into the mainstream — a big payout spike, then a backlash. There's no right
+            answer: read the hints below and gamble. (Ignoring it is the only sure loss.)
+          </div>
+        )}
       </div>
 
       {/* Direction hints — read the room (D5). No numbers. */}

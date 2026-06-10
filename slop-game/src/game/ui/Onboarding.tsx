@@ -29,8 +29,9 @@ export function Onboarding() {
   } else if (!state.progression.topicChipUnlocked) {
     // edge case — managers always unlock the Topic chip in BUY_MANAGER reducer
     msg = null
-  } else if (state.progression.topicChipUnlocked && state.pages.length === 1) {
-    msg = '🔥 See "hot now" up top? Tap the Topic chip and pick one that matches — it pays a bonus. Posting the same thing too long wears it out (watch "Freshness").'
+  } else if (!state.progression.firstRetuneDone) {
+    // stays up (with the chip spotlight-pulsing) until the first real retune
+    msg = '🔥 See "hot now" up top? Tap the glowing Topic chip and pick one that matches — it pays a bonus. Posting the same thing too long wears it out (watch "Freshness").'
   }
 
   if (!msg) return null

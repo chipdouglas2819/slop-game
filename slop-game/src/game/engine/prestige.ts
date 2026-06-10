@@ -38,7 +38,7 @@ export function reshuffleAffinity(
 // Banks available tokens, resets cash + page units (slot unlocks preserved),
 // reshuffles 15% of affinity, flips Trend.legible→false on the FIRST prestige (D2).
 export function applyAlgorithmUpdate(state: GameState, now: number): GameState {
-  const gained = tokensAvailable(state.lifetimeE, state.slopTokens)
+  const gained = tokensAvailable(state)
   if (gained <= 0) return state
 
   const wasFirst = state.algorithmUpdatesCompleted === 0

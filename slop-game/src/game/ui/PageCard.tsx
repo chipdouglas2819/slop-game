@@ -12,8 +12,10 @@ import {
 } from '../engine/data'
 import {
   effectiveCycleSec,
+  era,
   maxBuyable,
   nextMilestone,
+  pageBotShare,
   recipeKey,
   unitCost,
   SATURATION_OVERUSED_BELOW,
@@ -59,6 +61,12 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   const modelCostPerPost = MODEL_CYCLE_COST[page.recipe.model] * page.units
   const losingMoney = page.manager && dpsManager < 0
   const liveRate = page.manager ? dpsManager : tapPayout.dollars - tapPayout.modelCost
+  const gameEra = era(state)
+  const underCrackdown =
+    state.crackdown != null &&
+    state.crackdown.platform === slot.platform &&
+    state.lastTickAt < state.crackdown.untilMs
+  const spotlightTopic = chipsUnlocked && !state.progression.firstRetuneDone
 
   // ── Juice detectors ─────────────────────────────────────────────────────
   const prevUnits = useRef(page.units)
@@ -155,6 +163,9 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
             {isBurning && chipsUnlocked && page.units > 0 && (
               <span className="text-orange-400 text-[10px] shrink-0">⚠ overused</span>
             )}
+            {underCrackdown && (
+              <span className="text-cyan-300 text-[10px] shrink-0">🚨 crackdown</span>
+            )}
             <span className="ml-auto" />
             {page.units > 0 && (
               <span className={`font-mono text-sm font-semibold shrink-0 ${losingMoney ? 'text-red-400' : 'text-emerald-300'}`}>
@@ -197,7 +208,12 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
           {/* CHIPS — hidden until first manager bought (§5 Era I roll-out) */}
           {chipsUnlocked && page.units > 0 && (
             <div className="px-4 pb-2 flex flex-wrap gap-2">
-              <Chip label="Topic" value={TOPICS[page.recipe.topic].name} onClick={() => { sfx('uiOpen'); setPicker('topic') }} />
+              <Chip
+                label="Topic"
+                value={TOPICS[page.recipe.topic].name}
+                onClick={() => { sfx('uiOpen'); setPicker('topic') }}
+                spotlight={spotlightTopic}
+              />
               {state.progression.tacticChipUnlocked && (
                 <Chip label="Tactic" value={TACTICS[page.recipe.tactic].name} onClick={() => { sfx('uiOpen'); setPicker('tactic') }} />
               )}
@@ -252,6 +268,40 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
           {chipsUnlocked && page.units > 0 && (
             <div className="px-4 pb-3">
               <FactorStrip recipe={page.recipe} />
+            </div>
+          )}
+
+          {/* BOTS — Era II's tradeoff: more fake views (→ faster unlocks,
+              tokens, Zombie progress) for less money per view */}
+          {gameEra >= 2 && page.units > 0 && page.manager && (
+            <div className="px-4 pb-3">
+              <div className="bg-zinc-800/40 rounded-lg px-3 py-2">
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="text-zinc-400">🤖 Fake views (bots)</span>
+                  <span className="text-zinc-200 font-mono">{Math.round(page.bots * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(page.bots * 100)}
+                  onChange={(e) =>
+                    dispatch({ type: 'SET_BOTS', pageIdx, fraction: Number(e.target.value) / 100 })
+                  }
+                  className="w-full accent-cyan-500"
+                />
+                <div className="text-[10px] text-zinc-500 mt-0.5 leading-snug">
+                  views ×{(1 + 4 * page.bots).toFixed(1)} · pay per view −
+                  {Math.round(50 * page.bots)}% · {Math.round(pageBotShare(page.bots) * 100)}% of
+                  this page is bots. Bots speed up unlocks & Tokens — and feed the 🧟 meter.
+                </div>
+                {underCrackdown && (
+                  <div className="mt-1.5 text-[11px] text-cyan-300 bg-cyan-950/50 border border-cyan-800 rounded px-2 py-1">
+                    🚨 {PLATFORMS[slot.platform].name} is purging bots — your fake views do
+                    nothing here right now (the CPM hit stays).
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -325,11 +375,25 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   )
 }
 
-function Chip({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+function Chip({
+  label,
+  value,
+  onClick,
+  spotlight,
+}: {
+  label: string
+  value: string
+  onClick: () => void
+  spotlight?: boolean
+}) {
   return (
     <button
       onClick={onClick}
-      className="text-xs bg-zinc-800/80 hover:bg-zinc-700 border border-zinc-700 rounded-lg px-2.5 py-1.5 flex flex-col items-start"
+      className={`text-xs bg-zinc-800/80 hover:bg-zinc-700 border rounded-lg px-2.5 py-1.5 flex flex-col items-start ${
+        spotlight
+          ? 'border-fuchsia-400 ring-2 ring-fuchsia-500/60 animate-pulse' // first-retune spotlight
+          : 'border-zinc-700'
+      }`}
     >
       <span className="text-[10px] uppercase text-zinc-500 tracking-wider leading-none">{label}</span>
       <span className="text-zinc-100 leading-tight mt-0.5">{value}</span>

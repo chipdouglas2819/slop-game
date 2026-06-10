@@ -182,7 +182,14 @@ export function cyclePayout(state: GameState, page: PageState): CyclePayout {
   if (!slot || page.units <= 0) return { E: 0, dollars: 0, modelCost: 0 }
   const score = slopScore(state, page.recipe).total
   const geoE = page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_E_MULT : 1
-  const E = slot.baseE * page.units * score * botEMult(page.bots) * geoE
+  // During a platform crackdown the bot boost is voided there (the purge), but
+  // CPM dilution still applies — flagged fakes don't get refunded.
+  const purged =
+    state.crackdown != null &&
+    state.crackdown.platform === slot.platform &&
+    state.lastTickAt < state.crackdown.untilMs
+  const botBoost = purged ? 1 : botEMult(page.bots)
+  const E = slot.baseE * page.units * score * botBoost * geoE
   const cpmGeo =
     page.recipe.tactic === 'geo_boomers' ? GEO_US_BOOMER_CPM_MULT : state.geoMultiplier
   const cpm = effectiveCPM(PLATFORMS[slot.platform].cpm, cpmGeo, page.bots)
@@ -212,10 +219,120 @@ export function slopScore(state: GameState, r: Recipe): {
   // opening earnings just reads as "the game is broken". Flat 1.0 until then.
   const tr = state.progression.topicChipUnlocked ? trendMult(r, state.trend) : 1.0
   const sat = saturationMult(state.saturation[recipeKey(r)])
-  const tokens = 1 + 0.02 * state.slopTokens // soft prestige
-  // ZombieBonus omitted in Phase 1 (Era II/III gate)
-  const total = modelTier * aff * tac * tr * sat * tokens
+  // Soft prestige tokens × hard prestige weights (weights survive everything)
+  const tokens = (1 + 0.02 * state.slopTokens) * weightsMult(state.modelWeights)
+  const zb = zombieBonus(zombieRatio(state))
+  const total = modelTier * aff * tac * tr * sat * tokens * zb
   return { total, modelTier, affinity: aff, tactic: tac, trend: tr, saturation: sat, tokens }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Era II — Bots & the Zombie Ratio (§8)
+// Bots multiply views (botEMult) but dilute CPM: money-now vs progress. The
+// Zombie Ratio is the share of all your views that are bots watching bots —
+// the long-term goal of the whole game (Z=100% = the internet is dead = win).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Share of a single page's views that are bots: botE/(humanE+botE).
+export function pageBotShare(botFrac: number): number {
+  const boost = botEMult(botFrac) // 1 + 4b
+  return (boost - 1) / boost
+}
+
+// Global Z: view-weighted bot share across producing pages. Weighted by RAW
+// volume (baseE × units × botEMult) — deliberately score-free so this can be
+// called from inside slopScore (zombieBonus) without recursion.
+export function zombieRatio(state: GameState): number {
+  let total = 0
+  let bots = 0
+  for (const p of state.pages) {
+    if (p.units <= 0) continue
+    const slot = PAGE_SLOT_BY_ID[p.defId]
+    if (!slot) continue
+    const vol = (slot.baseE * p.units * botEMult(p.bots)) / slot.baseCycleSec
+    total += vol
+    bots += vol * pageBotShare(p.bots)
+  }
+  return total > 0 ? bots / total : 0
+}
+
+// Past 50% Z the bots start feeding each other — engagement begets engagement
+// (the early taste of the §8 endgame inversion where bot-on-bot E becomes the
+// whole economy).
+export function zombieBonus(z: number): number {
+  return 1 + Math.max(0, z - 0.5) * 2 // up to ×1.6 at the Era-II/III max of ~80%
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Eras + the hard prestige gate ("Pull the Plug", §6)
+// ─────────────────────────────────────────────────────────────────────────────
+export function era(state: GameState): 1 | 2 | 3 {
+  if (state.eraJumps > 0) return 3
+  if (state.algorithmUpdatesCompleted > 0) return 2
+  return 1
+}
+
+export const ERA_NAMES: Record<1 | 2 | 3, string> = {
+  1: 'Era I — The SEO Mill',
+  2: 'Era II — Social Slop',
+  3: 'Era III — Video Slop',
+}
+
+export function weightsMult(weights: number): number {
+  return 1 + 0.1 * weights
+}
+
+const PLUG_MIN_UPDATES = 2
+const PLUG_MIN_Z = 0.25
+const PLUG_ERA_E_FLOOR = new Decimal('1e16')
+
+// Views earned since the last plug — the gate AND the reward run on this, so
+// each era must be re-earned from scratch (lifetime-based gating let the sim
+// re-pull every 30 seconds forever).
+export function eraLifetimeE(state: GameState): Decimal {
+  return state.lifetimeE.minus(state.lifetimeEAtEraStart)
+}
+
+// Each successive era must be WORTH jumping to — the gain has to move your
+// total meaningfully (otherwise +1-weight micro-plugs every couple minutes
+// become the degenerate optimum; the sim found and abused it).
+export function plugGainNeeded(weights: number): number {
+  return Math.max(2, Math.ceil(weights * 0.2))
+}
+
+export function canPullPlug(state: GameState): boolean {
+  return (
+    state.algorithmUpdatesCompleted >= PLUG_MIN_UPDATES &&
+    zombieRatio(state) >= PLUG_MIN_Z &&
+    eraLifetimeE(state).gte(PLUG_ERA_E_FLOOR) &&
+    plugWeightsGained(eraLifetimeE(state)) >= plugGainNeeded(state.modelWeights)
+  )
+}
+
+// What still blocks the plug — for the UI to show as a checklist.
+export function plugRequirements(state: GameState): {
+  updates: { need: number; have: number; ok: boolean }
+  z: { need: number; have: number; ok: boolean }
+  eraE: { need: Decimal; have: Decimal; ok: boolean }
+} {
+  const z = zombieRatio(state)
+  const eraE = eraLifetimeE(state)
+  return {
+    updates: {
+      need: PLUG_MIN_UPDATES,
+      have: state.algorithmUpdatesCompleted,
+      ok: state.algorithmUpdatesCompleted >= PLUG_MIN_UPDATES,
+    },
+    z: { need: PLUG_MIN_Z, have: z, ok: z >= PLUG_MIN_Z },
+    eraE: { need: PLUG_ERA_E_FLOOR, have: eraE, ok: eraE.gte(PLUG_ERA_E_FLOOR) },
+  }
+}
+
+// Model Weights granted by pulling the plug — log-compressed on THIS ERA's views.
+export function plugWeightsGained(eraE: Decimal): number {
+  const ratio = eraE.div(PLUG_ERA_E_FLOOR).toNumber()
+  if (!isFinite(ratio) || ratio < 1) return 0
+  return Math.max(1, Math.floor(1 + 2 * Math.log10(ratio)))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,11 +412,15 @@ export function maxBuyable(slot: PageSlotDef, owned: number, cash: Decimal): num
 // buy), not at 2 min. A Phase-1 constant; revisit when Era gates exist.
 // ─────────────────────────────────────────────────────────────────────────────
 const TOKEN_ANCHOR = '3e15'
-export function tokensAvailable(lifetimeE: Decimal, spent: number): number {
-  const lifeNum = lifetimeE.div(new Decimal(TOKEN_ANCHOR)).toNumber()
+// Token curve runs on views earned THIS ERA — tokens are era-scoped (a plug
+// wipes them), so if the curve ran on lifetime views, one free Algorithm
+// Update right after a plug would re-grant the entire bank (+600 tokens for
+// nothing) and the plug's headline cost would be fake. Sim/playtest-proven.
+export function tokensAvailable(state: GameState): number {
+  const lifeNum = eraLifetimeE(state).div(new Decimal(TOKEN_ANCHOR)).toNumber()
   if (!isFinite(lifeNum) || lifeNum <= 0) return 0
   const total = Math.floor(150 * Math.sqrt(lifeNum))
-  return Math.max(0, total - spent)
+  return Math.max(0, total - state.slopTokens)
 }
 
 // First Algorithm Update is gated behind a lifetime-views FLOOR (not just
@@ -315,9 +436,12 @@ export function prestigeGainNeeded(banked: number): number {
   return Math.max(10, Math.ceil(banked * 0.1))
 }
 export function canPrestige(state: GameState): boolean {
-  if (state.algorithmUpdatesCompleted === 0 && state.lifetimeE.lt(new Decimal(PRESTIGE_LIFETIME_FLOOR))) {
+  if (
+    state.algorithmUpdatesCompleted === 0 &&
+    eraLifetimeE(state).lt(new Decimal(PRESTIGE_LIFETIME_FLOOR))
+  ) {
     return false
   }
-  const gain = tokensAvailable(state.lifetimeE, state.slopTokens)
+  const gain = tokensAvailable(state)
   return gain >= prestigeGainNeeded(state.slopTokens)
 }

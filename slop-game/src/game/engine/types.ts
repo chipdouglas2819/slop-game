@@ -149,6 +149,16 @@ export interface ProgressionState {
   modelChipUnlocked: boolean
   firstTapDone: boolean
   firstManagerBought: boolean
+  firstRetuneDone: boolean // ends the topic-chip spotlight + teaching hint
+  firstScandalSeen: boolean // first interrupt gets an explainer block
+}
+
+// A platform bot-purge (D8) — re-opens the bot decision without new content.
+// While active, bot view-boosts on that platform do nothing (CPM dilution
+// still applies — the fakes are flagged, not refunded).
+export interface CrackdownState {
+  platform: PlatformId
+  untilMs: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,9 +238,18 @@ export interface GameState {
   pages: PageState[]
   unlockedSlots: string[] // PageSlotDef ids the player has bought into existence
 
-  // Prestige
+  // Prestige — soft layer (Algorithm Update)
   slopTokens: number // banked
   algorithmUpdatesCompleted: number
+
+  // Prestige — hard layer ("Pull the Plug" / Era Jump, §6)
+  modelWeights: number // permanent; survive EVERYTHING (+10% each)
+  eraJumps: number // 0 = Eras I–II, 1+ = Era III (Model axis live)
+  lifetimeEAtEraStart: Decimal // plug gate/reward use views earned THIS era —
+  // otherwise one botted page re-arms the plug instantly, forever (sim-proven)
+
+  // Era II — platform bot-purge event (D8); null when none active
+  crackdown: CrackdownState | null
 
   // Affinity table (mutable so prestige can reshuffle 15%)
   affinity: Record<TopicId, Partial<Record<PlatformId, Band>>>
@@ -259,6 +278,9 @@ export interface GameState {
   // Transient: tokens gained in the most recent Algorithm Update, for the
   // post-reset celebration banner (null once dismissed)
   lastPrestigeGain: number | null
+
+  // Transient: weights gained by the most recent Pull-the-Plug (era banner)
+  lastEraJumpGain: number | null
 
   // Timestamps
   lastTickAt: number
