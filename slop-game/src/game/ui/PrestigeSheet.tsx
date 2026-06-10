@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { tokensAvailable } from '../engine/math'
 import { useLockBodyScroll } from './useLockBodyScroll'
+import { sfx } from './sfx'
 
 // Plain-language "should I reset?" sheet — mobile has no hover tooltip, so the
 // whole trade is spelled out: what you lose, what you gain, before/after, and
@@ -43,6 +44,13 @@ export function PrestigeSheet({ onClose }: { onClose: () => void }) {
           (the bonus grows by the square root). Reset when the gain feels worth starting over.
         </p>
 
+        {state.algorithmUpdatesCompleted === 0 && (
+          <p className="text-[11px] text-amber-300/90 leading-snug bg-amber-950/40 border border-amber-900 rounded-lg px-2.5 py-2">
+            ⚠ Fair warning: after your first update, the Algorithm <em>goes dark</em> — it'll show
+            you what's hot, but never the numbers again. And some topic fits get reshuffled.
+          </p>
+        )}
+
         <div className="flex gap-2">
           <button
             onClick={onClose}
@@ -52,6 +60,7 @@ export function PrestigeSheet({ onClose }: { onClose: () => void }) {
           </button>
           <button
             onClick={() => {
+              sfx('prestige')
               dispatch({ type: 'PRESTIGE', now: Date.now() })
               onClose()
             }}

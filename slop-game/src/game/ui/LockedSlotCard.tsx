@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { PAGE_SLOTS, PLATFORMS } from '../engine/data'
 import { fmtMoney, fmtNumber } from '../format'
+import { sfx } from './sfx'
 
 // Teaser for the next locked page. Shows BOTH unlock requirements (cash AND
 // lifetime views) with met/unmet ticks, so the button is never a dead end.
@@ -17,7 +18,11 @@ export function LockedSlotCard() {
   return (
     <button
       disabled={!canUnlock}
-      onClick={() => canUnlock && dispatch({ type: 'UNLOCK_SLOT', slotId: next.id })}
+      onClick={() => {
+        if (!canUnlock) return
+        sfx('unlock')
+        dispatch({ type: 'UNLOCK_SLOT', slotId: next.id })
+      }}
       className={`w-full text-left bg-zinc-900/30 border border-dashed rounded-2xl p-4 ${
         canUnlock
           ? 'border-fuchsia-600 hover:bg-fuchsia-900/20 cursor-pointer animate-pulse'

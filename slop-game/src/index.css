@@ -33,3 +33,16 @@ input[type="range"] {
   from { transform: translate(-50%, -120%); opacity: 0; }
   to   { transform: translate(-50%, 0);     opacity: 1; }
 }
+
+/* Floating +$ on publish payouts */
+@keyframes floatUp {
+  0%   { transform: translateY(0);      opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translateY(-56px);  opacity: 0; }
+}
+
+/* Quick scale-pop for celebrations and delta flashes */
+@keyframes flashPop {
+  0%   { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1);    opacity: 1; }
+}

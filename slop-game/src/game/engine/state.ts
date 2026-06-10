@@ -13,6 +13,7 @@ import type {
 import { AFFINITY_DEFAULT, PAGE_SLOTS, PAGE_SLOT_BY_ID, managerCost } from './data'
 import {
   affinityMult,
+  canPrestige,
   cyclePayout,
   effectiveCycleSec,
   maxBuyable,
@@ -22,6 +23,7 @@ import {
   saturationRecover,
   slopScore,
   tacticMult,
+  tokensAvailable,
   trendMult,
   unitCost,
 } from './math'
@@ -62,12 +64,32 @@ export function defaultRecipeFor(platform: PlatformId): Recipe {
   }
 }
 
-function makePage(slot: PageSlotDef): PageState {
+// For a NEWLY unlocked page, pick the best topic that hasn't been burned out
+// by an existing page (saturation is shared per-recipe, so the static default
+// used to make every new Google page spawn "⚠ overused").
+function freshDefaultRecipe(state: GameState, platform: PlatformId): Recipe {
+  const base = defaultRecipeFor(platform)
+  let best = base
+  let bestScore = -1
+  for (const topicId of Object.keys(state.affinity) as TopicId[]) {
+    const candidate: Recipe = { ...base, topic: topicId }
+    const aff = affinityMult(state, candidate)
+    const sat = saturationMult(state.saturation[recipeKey(candidate)])
+    const score = aff * sat
+    if (score > bestScore) {
+      bestScore = score
+      best = candidate
+    }
+  }
+  return best
+}
+
+function makePage(slot: PageSlotDef, state?: GameState): PageState {
   return {
     defId: slot.id,
     units: 0,
     bots: 0,
-    recipe: defaultRecipeFor(slot.platform),
+    recipe: state ? freshDefaultRecipe(state, slot.platform) : defaultRecipeFor(slot.platform),
     manager: false,
     cycleProgress: 0,
   }
@@ -101,6 +123,7 @@ export function initialState(now: number = Date.now()): GameState {
     firedSignatureScandals: [],
     lastScandalResult: null,
     scandalCooldownUntil: 0,
+    lastPrestigeGain: null,
     monetization: {
       clout: 0,
       permanentMult: 1,
@@ -146,6 +169,7 @@ export type Action =
   | { type: 'SCANDAL_RESOLVE'; choice: ScandalChoice }
   | { type: 'SCANDAL_IGNORE' }
   | { type: 'CLEAR_SCANDAL_RESULT' }
+  | { type: 'CLEAR_PRESTIGE_RESULT' }
   | { type: 'BUY_CLOUT'; clout: number; centsPretend: number }
   | { type: 'BUY_PERMANENT_MULT'; cloutCost: number; mult: number }
   | { type: 'WATCH_AD_BOOST'; now: number }
@@ -223,7 +247,7 @@ export function reduce(state: GameState, action: Action): GameState {
       return {
         ...state,
         unlockedSlots: [...state.unlockedSlots, action.slotId],
-        pages: [...state.pages, makePage(slot)],
+        pages: [...state.pages, makePage(slot, state)],
       }
     }
 
@@ -322,9 +346,14 @@ export function reduce(state: GameState, action: Action): GameState {
         // Saturation is TIME-based: accrue the active seconds onto this recipe
         // (independent of units/E/profit), so "freshness" reads as a steady
         // timer and a flooded niche cools while you run something else.
+        // Grace period: don't accrue until the Topic chip exists — a brand-new
+        // player must not watch their number decay before they have the tool
+        // (switching topics) to respond.
         const key = recipeKey(p.recipe)
         activeKeys.add(key)
-        saturation[key] = (saturation[key] ?? 0) + dt
+        if (state.progression.topicChipUnlocked) {
+          saturation[key] = (saturation[key] ?? 0) + dt
+        }
 
         // For a manager-on page, show a sensible /sec contribution
         if (p.manager) {
@@ -409,19 +438,28 @@ export function reduce(state: GameState, action: Action): GameState {
     }
 
     case 'PRESTIGE': {
+      // Enforce the same gate as the button (the sim dispatches directly).
+      if (!canPrestige(state)) return state
+      const gained = tokensAvailable(state.lifetimeE, state.slopTokens)
       const updated = applyAlgorithmUpdate(state, action.now)
       if (updated === state) return state
       let s = maybeUnlock(updated, 'first_prestige')
       // §5 Era II — Tactic chip unlocks at the first Algorithm Update
       s = {
         ...s,
+        lastPrestigeGain: gained, // powers the post-reset celebration banner
         progression: {
           ...s.progression,
+          topicChipUnlocked: true, // latent-trap fix: never lose the topic chip
           tacticChipUnlocked: true,
           modelChipUnlocked: true, // also unlock model at this beat for the prototype
         },
       }
       return s
+    }
+
+    case 'CLEAR_PRESTIGE_RESULT': {
+      return { ...state, lastPrestigeGain: null }
     }
 
     case 'BUY_CLOUT': {

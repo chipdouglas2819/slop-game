@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { ACHIEVEMENT_BY_ID } from '../engine/data'
+import { sfx } from './sfx'
 
-// Slide-in toast when an achievement unlocks. Phase 1 picks newly-added ids
-// off the unlocked list and queues them; queue empties on display.
+// Slide-in toast when an achievement unlocks. Only achievements earned THIS
+// session toast — the seen-set starts from the loaded save, otherwise every
+// reload replays the whole trophy case (now with sound, that would be a crime).
 export function AchievementToast() {
   const { state } = useStore()
-  const seenRef = useRef<Set<string>>(new Set())
+  const seenRef = useRef<Set<string> | null>(null)
+  if (seenRef.current === null) seenRef.current = new Set(state.unlocked)
   const [queue, setQueue] = useState<string[]>([])
 
   useEffect(() => {
+    const seen = seenRef.current!
     const newly: string[] = []
     for (const id of state.unlocked) {
-      if (!seenRef.current.has(id)) {
-        seenRef.current.add(id)
+      if (!seen.has(id)) {
+        seen.add(id)
         newly.push(id)
       }
     }
@@ -23,6 +27,7 @@ export function AchievementToast() {
   const current = queue[0]
   useEffect(() => {
     if (!current) return
+    sfx('achievement')
     const t = setTimeout(() => setQueue((q) => q.slice(1)), 4500)
     return () => clearTimeout(t)
   }, [current])

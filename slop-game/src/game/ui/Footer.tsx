@@ -5,6 +5,7 @@ import { ACHIEVEMENTS } from '../engine/data'
 import { clearSave } from '../engine/persistence'
 import { useLockBodyScroll } from './useLockBodyScroll'
 import { SlopStore } from './SlopStore'
+import { isMuted, setMuted, sfx } from './sfx'
 
 // Minimal footer — the one vanity drawer slot (§10). Just achievements + the
 // resource-tooltip thesis line, plus a hard-reset escape hatch for testing.
@@ -12,36 +13,32 @@ export function Footer() {
   const { state, dispatch } = useStore()
   const [open, setOpen] = useState<'achievements' | 'about' | 'howto' | null>(null)
   const [storeOpen, setStoreOpen] = useState(false)
+  const [muted, setMutedState] = useState(isMuted)
   useLockBodyScroll(open !== null)
   const unlocked = state.unlocked.length
   const total = ACHIEVEMENTS.length
 
+  function toggleMute() {
+    const next = !muted
+    setMuted(next)
+    setMutedState(next)
+    if (!next) sfx('uiOpen') // audible confirmation when unmuting
+  }
+
   return (
     <>
-      <footer className="fixed bottom-0 inset-x-0 z-10 bg-zinc-950/95 backdrop-blur border-t border-zinc-800">
-        <div className="max-w-md mx-auto px-3 py-2 flex items-center gap-3 text-xs">
-          <button
-            onClick={() => setOpen('howto')}
-            className="text-fuchsia-300 hover:text-fuchsia-200 font-medium"
-          >
-            ❓ How to play
-          </button>
-          <button onClick={() => setStoreOpen(true)} className="text-amber-300 hover:text-amber-200">
-            🛒 Store
-          </button>
-          <button
-            onClick={() => setOpen('achievements')}
-            className="text-zinc-400 hover:text-zinc-200"
-          >
-            🏆 {unlocked}/{total}
-          </button>
-          <button
-            onClick={() => setOpen('about')}
-            className="text-zinc-400 hover:text-zinc-200"
-          >
-            What is SLOP?
-          </button>
-          <span className="flex-1" />
+      {/* Visible tab bar — the old footer was 33px of near-black-on-black; the
+          Store and help were effectively undiscoverable */}
+      <footer
+        className="fixed bottom-0 inset-x-0 z-10 bg-zinc-900 border-t-2 border-zinc-700 shadow-[0_-4px_16px_rgba(0,0,0,0.5)]"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="max-w-md mx-auto px-2 py-1.5 flex items-stretch gap-1 text-xs">
+          <TabButton emoji="❓" label="How to" onClick={() => { sfx('uiOpen'); setOpen('howto') }} accent="text-fuchsia-300" />
+          <TabButton emoji="🛒" label="Store" onClick={() => { sfx('uiOpen'); setStoreOpen(true) }} accent="text-amber-300" />
+          <TabButton emoji="🏆" label={`${unlocked}/${total}`} onClick={() => { sfx('uiOpen'); setOpen('achievements') }} accent="text-zinc-200" />
+          <TabButton emoji="🤔" label="SLOP?" onClick={() => { sfx('uiOpen'); setOpen('about') }} accent="text-zinc-200" />
+          <TabButton emoji={muted ? '🔇' : '🔊'} label={muted ? 'muted' : 'sound'} onClick={toggleMute} accent="text-zinc-200" />
           <button
             onClick={() => {
               if (confirm('Wipe save?')) {
@@ -49,7 +46,7 @@ export function Footer() {
                 dispatch({ type: 'HARD_RESET', now: Date.now() })
               }
             }}
-            className="text-zinc-600 hover:text-zinc-400 text-[10px]"
+            className="px-2 text-zinc-600 hover:text-zinc-400 text-[10px] self-center"
           >
             reset
           </button>
@@ -152,6 +149,28 @@ export function Footer() {
       )}
       {storeOpen && <SlopStore onClose={() => setStoreOpen(false)} />}
     </>
+  )
+}
+
+function TabButton({
+  emoji,
+  label,
+  onClick,
+  accent,
+}: {
+  emoji: string
+  label: string
+  onClick: () => void
+  accent: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex-1 flex flex-col items-center gap-0.5 rounded-lg py-1.5 hover:bg-zinc-800 active:bg-zinc-700"
+    >
+      <span className="text-base leading-none">{emoji}</span>
+      <span className={`text-[10px] font-medium leading-none ${accent}`}>{label}</span>
+    </button>
   )
 }
 

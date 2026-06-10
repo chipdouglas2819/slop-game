@@ -1,5 +1,6 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import type { ReactNode } from 'react'
+import Decimal from 'break_infinity.js'
 import { reduce } from './engine/state'
 import { loadGame, saveGame } from './engine/persistence'
 import { StoreContext } from './store'
@@ -7,23 +8,33 @@ import { StoreContext } from './store'
 const TICK_INTERVAL_MS = 100 // 10Hz — smooth enough for UI, easy on mobile CPU
 const SAVE_INTERVAL_MS = 5000
 
+interface Boot {
+  state: ReturnType<typeof loadGame>['state']
+  offlineMs: number
+  offlineEarned: Decimal
+}
+
+// Load + apply the offline catch-up tick SYNCHRONOUSLY at init, so we can
+// report exactly what was earned while away (and the first paint is already
+// caught up — no flash of stale numbers).
+function boot(): Boot {
+  const now = Date.now()
+  const loaded = loadGame(now)
+  if (loaded.offlineMs > 1000) {
+    const ticked = reduce(loaded.state, { type: 'TICK', now })
+    return {
+      state: ticked,
+      offlineMs: loaded.offlineMs,
+      offlineEarned: ticked.money.minus(loaded.state.money),
+    }
+  }
+  return { state: loaded.state, offlineMs: loaded.offlineMs, offlineEarned: new Decimal(0) }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  // Lazy init: load from localStorage on first render
-  const [initial] = useState(() => loadGame(Date.now()))
+  const [initial] = useState(boot)
   const [state, dispatch] = useReducer(reduce, initial.state)
   const [offlineMs, setOfflineMs] = useState(initial.offlineMs)
-
-  // Apply offline-progress tick on mount
-  const appliedOffline = useRef(false)
-  useEffect(() => {
-    if (appliedOffline.current) return
-    appliedOffline.current = true
-    if (initial.offlineMs > 1000) {
-      // The reducer's TICK consumes lastTickAt → now; setting now=Date.now()
-      // applies the full offline delta (capped at 24h inside the reducer).
-      dispatch({ type: 'TICK', now: Date.now() })
-    }
-  }, [initial.offlineMs])
 
   // Game tick loop — setInterval (not rAF) so it keeps running when the tab
   // is backgrounded or the preview iframe isn't actively repainting.
@@ -55,6 +66,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         state,
         dispatch,
         offlineMs,
+        offlineEarned: initial.offlineEarned,
         clearOfflineMs: () => setOfflineMs(0),
       }}
     >

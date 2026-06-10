@@ -19,17 +19,31 @@ export function AlgorithmBar() {
   const rate = totalDollarsPerSec(state)
   const showTrend = state.progression.topicChipUnlocked
   const telegraphing = showTrend && isTelegraphing(state.trend, Date.now())
+  const permMult = state.monetization?.permanentMult ?? 1
+  const bonusMult = (1 + 0.02 * state.slopTokens) * permMult
 
   return (
     <>
       <header className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur border-b border-zinc-800">
-        <div className="max-w-md mx-auto px-3 pt-2 pb-1 flex items-center justify-between">
+        <div className="max-w-md mx-auto px-3 pt-2 pb-1 flex items-center justify-between gap-2">
           <div>
             <div className="text-emerald-300 font-mono text-lg font-semibold leading-none">
               {fmtMoney(state.money)}
             </div>
             <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{fmtMoney(rate)}/sec</div>
           </div>
+
+          {/* Permanent-bonus chip — the prestige reward must stay visible
+              forever, not just inside the confirm sheet */}
+          {bonusMult > 1 && (
+            <div
+              className="shrink-0 flex items-center gap-1.5 rounded-lg border border-fuchsia-800 bg-fuchsia-950/50 px-2 py-1"
+              title={`${state.slopTokens} Slop Tokens${permMult > 1 ? ` + ×${permMult.toFixed(1)} store bonus` : ''} — everything you earn is multiplied by ×${bonusMult.toFixed(2)}, forever.`}
+            >
+              <span className="text-fuchsia-300 text-xs font-mono font-semibold">⚡{state.slopTokens}</span>
+              <span className="text-fuchsia-200/90 text-xs font-mono">×{bonusMult.toFixed(2)}</span>
+            </div>
+          )}
 
           {ready && (
             <button
@@ -51,7 +65,7 @@ export function AlgorithmBar() {
                 ? '🔥 hot now — post these for bonus $'
                 : '🔥 hot now — match these (the algorithm hides the numbers)'}
             </div>
-            <div className="flex items-center gap-2 mt-1 overflow-x-auto no-scrollbar">
+            <div className="flex flex-wrap items-center gap-1.5 mt-1">
               {state.trend.hot.map((h) => (
                 <span
                   key={h.tag}

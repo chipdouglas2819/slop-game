@@ -93,6 +93,24 @@ export function trendDirection(r: Recipe, trend: TrendState): 'hot' | 'cold' | '
   return 'neutral'
 }
 
+// Per-OPTION trend reading for pickers: judged on the option's OWN tags only,
+// so the 🔥 badge discriminates between choices. (Judging the whole candidate
+// recipe made every topic light up whenever a model/platform tag was hot.)
+export function tagsTrendDirection(tags: Tag[], trend: TrendState): 'hot' | 'cold' | 'neutral' {
+  const hot = trend.hot.some((h) => tags.includes(h.tag))
+  const cold = trend.suppressed.some((t) => tags.includes(t))
+  if (hot && !cold) return 'hot'
+  if (cold && !hot) return 'cold'
+  return 'neutral'
+}
+
+// The bonus those own-tags contribute, as a friendly percent (legible mode).
+export function tagsTrendBonusPercent(tags: Tag[], trend: TrendState): number {
+  let mult = 1
+  for (const h of trend.hot) if (tags.includes(h.tag)) mult *= h.magnitude
+  return Math.round((mult - 1) * 100)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Saturation (§4.6) — TIME-based, so "freshness" is a legible timer the player
 // can read: post the same recipe for a couple of minutes and it goes stale;
@@ -102,8 +120,12 @@ export function trendDirection(r: Recipe, trend: TrendState): 'hot' | 'cold' | '
 // profit-multiplier inflation never touches it.
 // ─────────────────────────────────────────────────────────────────────────────
 const SATURATION_FLOOR = 0.35
-const SATURATION_K = 0.012 // ~0.6 at ~150s active, floor by ~10 min continuous
+const SATURATION_K = 0.006 // ~0.6 at ~5 min active; playtest said 0.012 felt relentless
 const SATURATION_HALFLIFE_MS = 150_000 // idle recipe recovers half its staleness every 2.5 min
+
+// One source of truth for "is this recipe overused?" so the warning chip and
+// the freshness bar can never contradict each other.
+export const SATURATION_OVERUSED_BELOW = 0.7
 
 export function saturationMult(activeSeconds: number | undefined): number {
   if (!activeSeconds) return 1.0
@@ -115,9 +137,12 @@ export function saturationRecover(s: number, dtMs: number): number {
   return s * Math.exp(-(Math.LN2 / SATURATION_HALFLIFE_MS) * dtMs)
 }
 
-// Visible "freshness" 0..1 (1 = fresh, floors at 0.35 = burned)
+// Visible "freshness" 0..1, NORMALIZED over [floor, 1] so a fully burned
+// recipe shows an EMPTY bar (the raw multiplier floors at 0.35, which used to
+// render as a misleading 1-2 filled cells).
 export function saturationGauge(activeSeconds: number | undefined): number {
-  return saturationMult(activeSeconds)
+  const raw = saturationMult(activeSeconds)
+  return Math.max(0, (raw - SATURATION_FLOOR) / (1 - SATURATION_FLOOR))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,10 +303,18 @@ export function tokensAvailable(lifetimeE: Decimal, spent: number): number {
 // tokens ≥ 1) so the reset button can't appear in the first couple minutes —
 // idle-canon wants the first prestige to land deeper in, as a considered choice
 // (~tens of tokens at once), not the instant the economy plateaus.
+//
+// Repeat updates are gated on a MEANINGFUL gain (min 10 tokens AND +10% of the
+// bank) — the playtest showed prestige otherwise degenerates into a button you
+// mash every two minutes, snowballing thousands of tokens in an hour.
 const PRESTIGE_LIFETIME_FLOOR = '1e13'
+export function prestigeGainNeeded(banked: number): number {
+  return Math.max(10, Math.ceil(banked * 0.1))
+}
 export function canPrestige(state: GameState): boolean {
   if (state.algorithmUpdatesCompleted === 0 && state.lifetimeE.lt(new Decimal(PRESTIGE_LIFETIME_FLOOR))) {
     return false
   }
-  return tokensAvailable(state.lifetimeE, state.slopTokens) >= 1
+  const gain = tokensAvailable(state.lifetimeE, state.slopTokens)
+  return gain >= prestigeGainNeeded(state.slopTokens)
 }

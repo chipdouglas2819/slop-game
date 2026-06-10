@@ -28,15 +28,21 @@ const ILLION_NAMES = [
   'Vg',
 ] as const
 
+// "200.0" → "200", "1.50" → "1.5", "4.28" stays — round numbers shouldn't
+// drag decimal zeros around the UI.
+function trimZeros(s: string): string {
+  return s.includes('.') ? s.replace(/\.?0+$/, '') : s
+}
+
 export function fmtNumber(value: number | Decimal): string {
   const d = value instanceof Decimal ? value : new Decimal(value)
   if (d.lt(0)) return '-' + fmtNumber(d.abs())
   if (d.lt(1)) {
     const n = d.toNumber()
     if (n === 0) return '0'
-    return n.toFixed(2) // sub-dollar / sub-unit shows as 0.00–0.99
+    return trimZeros(n.toFixed(2)) // sub-dollar / sub-unit shows as 0.01–0.99
   }
-  if (d.lt(1000)) return d.toNumber().toFixed(d.lt(10) ? 2 : 1)
+  if (d.lt(1000)) return trimZeros(d.toNumber().toFixed(d.lt(10) ? 2 : 1))
 
   // Engineering exponent (multiple of 3)
   const exp = Math.floor(d.log10())
@@ -44,7 +50,7 @@ export function fmtNumber(value: number | Decimal): string {
   if (eng / 3 < ILLION_NAMES.length) {
     const suffix = ILLION_NAMES[eng / 3]
     const mantissa = d.div(new Decimal(10).pow(eng)).toNumber()
-    return `${mantissa.toFixed(mantissa < 10 ? 2 : mantissa < 100 ? 1 : 0)}${suffix}`
+    return `${trimZeros(mantissa.toFixed(mantissa < 10 ? 2 : mantissa < 100 ? 1 : 0))}${suffix}`
   }
   return d.toExponential(2)
 }

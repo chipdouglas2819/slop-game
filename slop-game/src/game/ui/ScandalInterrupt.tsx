@@ -1,6 +1,8 @@
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import { scandalHints } from '../engine/scandals'
 import { PLATFORMS, TOPICS } from '../engine/data'
+import { sfx } from './sfx'
 
 // The "Goes Mainstream" interrupt (§7, D7). A prominent card pinned to the top
 // of the Feed — never a menu. Three-way gamble, no dominant option; the player
@@ -8,6 +10,17 @@ import { PLATFORMS, TOPICS } from '../engine/data'
 export function ScandalInterrupt() {
   const { state, dispatch } = useStore()
   const sc = state.activeScandal
+  const stungFor = useRef<string | null>(null)
+
+  // Ominous stinger when a scandal lands (once per scandal per session — a
+  // page load with a pending scandal re-alerts once, which is the point)
+  useEffect(() => {
+    if (sc && stungFor.current !== sc.instanceId) {
+      stungFor.current = sc.instanceId
+      sfx('scandal')
+    }
+  }, [sc])
+
   if (!sc) return null
 
   const hints = scandalHints(state)
@@ -54,21 +67,21 @@ export function ScandalInterrupt() {
           label="Ride it"
           desc="Take the whole spike. Backlash bites hardest if the niche is still hot."
           tone="ride"
-          onClick={() => dispatch({ type: 'SCANDAL_RESOLVE', choice: 'ride' })}
+          onClick={() => { sfx('resolve'); dispatch({ type: 'SCANDAL_RESOLVE', choice: 'ride' }) }}
         />
         <ChoiceButton
           label="Cash out & pivot"
           desc="Bank most of the spike, jump to a fresh niche before backlash lands."
           tone="cashout"
           disabled={sc.rideOnly}
-          onClick={() => dispatch({ type: 'SCANDAL_RESOLVE', choice: 'cashout' })}
+          onClick={() => { sfx('resolve'); dispatch({ type: 'SCANDAL_RESOLVE', choice: 'cashout' }) }}
         />
         <ChoiceButton
           label="Damage-control"
           desc="Spend cash to keep the niche. Worth it only for a real cash cow."
           tone="damage"
           disabled={sc.rideOnly || !hints.canAffordDamage}
-          onClick={() => dispatch({ type: 'SCANDAL_RESOLVE', choice: 'damage' })}
+          onClick={() => { sfx('resolve'); dispatch({ type: 'SCANDAL_RESOLVE', choice: 'damage' }) }}
         />
         {sc.rideOnly && (
           <div className="text-[11px] text-orange-300/80 italic text-center pt-1">

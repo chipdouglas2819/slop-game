@@ -1,15 +1,19 @@
 import { useStore } from '../store'
-import { affinityBand, tacticBand, trendDirection } from '../engine/math'
+import {
+  affinityBand,
+  tacticBand,
+  tagsTrendBonusPercent,
+  tagsTrendDirection,
+} from '../engine/math'
 import {
   BAND_GLYPH,
   BAND_LABEL,
   MODELS,
   MODEL_CYCLE_COST,
-  PLATFORMS,
   TACTICS,
   TOPICS,
 } from '../engine/data'
-import type { ModelId, Recipe, TacticId, TopicId } from '../engine/types'
+import type { ModelId, Recipe, TacticId, Tag, TopicId } from '../engine/types'
 import { useLockBodyScroll } from './useLockBodyScroll'
 
 type Axis = 'model' | 'topic' | 'tactic'
@@ -74,7 +78,11 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
             const showBand: 'aff' | 'tac' | 'tier' =
               axis === 'tactic' ? 'tac' : axis === 'model' ? 'tier' : 'aff'
             const band = showBand === 'tac' ? tac : aff
-            const trend = trendDirection(candidate, state.trend)
+            // Trend is judged on THIS OPTION's own tags — so 🔥 actually
+            // discriminates between choices (the whole-recipe check made every
+            // row light up whenever a model/platform tag happened to be hot).
+            const ownTags = opt.tags as Tag[]
+            const trend = tagsTrendDirection(ownTags, state.trend)
             const isCurrent = opt.id === recipe[axis]
 
             return (
@@ -120,7 +128,14 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
                     {trend === 'hot' && (
                       <span className="text-[11px] text-orange-400 font-mono whitespace-nowrap">
                         🔥 trending
-                        {state.trend.legible ? ` +${trendBonusPercent(candidate, state)}%` : ''}
+                        {state.trend.legible
+                          ? ` +${tagsTrendBonusPercent(ownTags, state.trend)}%`
+                          : ''}
+                      </span>
+                    )}
+                    {trend === 'cold' && (
+                      <span className="text-[11px] text-sky-400 font-mono whitespace-nowrap">
+                        ❄ everyone's over it
                       </span>
                     )}
                   </div>
@@ -132,19 +147,6 @@ export function ChipPicker({ axis, recipe, onPick, onClose }: Props) {
       </div>
     </div>
   )
-}
-
-// The combined trend bonus for a candidate recipe, as a friendly "+170%".
-function trendBonusPercent(candidate: Recipe, state: ReturnType<typeof useStore>['state']): number {
-  const allTags = [
-    ...MODELS[candidate.model].tags,
-    ...TOPICS[candidate.topic].tags,
-    ...PLATFORMS[candidate.platform].tags,
-    ...TACTICS[candidate.tactic].tags,
-  ]
-  let mult = 1
-  for (const h of state.trend.hot) if (allTags.includes(h.tag)) mult *= h.magnitude
-  return Math.round((mult - 1) * 100)
 }
 
 // Order options so the BEST fit for THIS page floats to the top (Great → Good →

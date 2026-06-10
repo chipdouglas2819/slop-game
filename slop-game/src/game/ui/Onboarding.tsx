@@ -10,9 +10,17 @@ export function Onboarding() {
   const hasUnit = p.units > 0
   const hasTapped = state.progression.firstTapDone
   const hasManager = p.manager
+  const isRebuild = state.algorithmUpdatesCompleted > 0
 
   let msg: string | null = null
-  if (!hasUnit) {
+  if (isRebuild) {
+    // Post-prestige runs: the player knows the loop — never replay the
+    // tutorial. One rebuild-framing hint until production restarts, then quiet.
+    if (!hasUnit) {
+      const mult = 1 + 0.02 * state.slopTokens
+      msg = `⚡ Rebuild time. Your ${state.slopTokens} tokens multiply everything ×${mult.toFixed(2)} — this run will be faster.`
+    }
+  } else if (!hasUnit) {
     msg = '👇 Tap “Buy ×1 (free)” to start your first page.'
   } else if (!hasTapped) {
     msg = '👇 Tap the big Publish button to earn your first dollars.'
@@ -29,7 +37,9 @@ export function Onboarding() {
 
   return (
     <div className="max-w-md mx-auto px-3 mt-3">
-      <div className="bg-fuchsia-950/60 border border-fuchsia-800 rounded-xl px-3 py-2 text-xs text-fuchsia-100">
+      {/* min-height reserves two lines so hint changes don't shift the layout
+          under the player's finger mid-tap */}
+      <div className="min-h-[3.25rem] flex items-center bg-fuchsia-950/60 border border-fuchsia-800 rounded-xl px-3 py-2 text-xs text-fuchsia-100">
         {msg}
       </div>
     </div>

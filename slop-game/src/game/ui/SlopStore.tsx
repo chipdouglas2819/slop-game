@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useStore } from '../store'
 import { useLockBodyScroll } from './useLockBodyScroll'
 import { fmtMoney } from '../format'
+import { sfx } from './sfx'
 
 // Monetization SIMULATION (D11) — a FAKE, non-charging store so the ethical-F2P
 // layer can be felt. Nothing here charges real money; nothing touches the recipe
@@ -61,7 +62,7 @@ export function SlopStore({ onClose }: { onClose: () => void }) {
               {CLOUT_PACKS.map((p) => (
                 <button
                   key={p.cents}
-                  onClick={() => dispatch({ type: 'BUY_CLOUT', clout: p.clout, centsPretend: p.cents })}
+                  onClick={() => { sfx('kaching'); dispatch({ type: 'BUY_CLOUT', clout: p.clout, centsPretend: p.cents }) }}
                   className="text-left rounded-xl border border-zinc-700 bg-zinc-800/60 hover:bg-zinc-700 p-3"
                 >
                   <div className="text-zinc-100 font-semibold text-sm">✨ {p.clout.toLocaleString('en-US')}</div>
@@ -82,7 +83,7 @@ export function SlopStore({ onClose }: { onClose: () => void }) {
               </div>
               <button
                 disabled={permMaxed || m.clout < PERM_MULT_COST}
-                onClick={() => dispatch({ type: 'BUY_PERMANENT_MULT', cloutCost: PERM_MULT_COST, mult: PERM_MULT_STEP })}
+                onClick={() => { sfx('kaching'); dispatch({ type: 'BUY_PERMANENT_MULT', cloutCost: PERM_MULT_COST, mult: PERM_MULT_STEP }) }}
                 className="rounded-lg bg-fuchsia-700 hover:bg-fuchsia-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-xs font-semibold px-3 py-2"
               >
                 {permMaxed ? 'Maxed' : `+${PERM_MULT_STEP}× · ✨${PERM_MULT_COST}`}
@@ -94,7 +95,7 @@ export function SlopStore({ onClose }: { onClose: () => void }) {
           <Section title="2× Boost" sub={`watch a (fake) ad · ${BOOST_DAILY_CAP - m.boostsToday}/${BOOST_DAILY_CAP} left today · 4 hours`}>
             <button
               disabled={m.boostsToday >= BOOST_DAILY_CAP}
-              onClick={() => dispatch({ type: 'WATCH_AD_BOOST', now: Date.now() })}
+              onClick={() => { sfx('payout'); dispatch({ type: 'WATCH_AD_BOOST', now: Date.now() }) }}
               className="w-full rounded-lg bg-emerald-700 hover:bg-emerald-600 disabled:bg-zinc-800 disabled:text-zinc-600 text-white text-sm font-semibold py-2.5"
             >
               {boostOn ? '2× is active — watch again to extend' : '▶ Watch a fake ad for 2× earnings'}
@@ -105,7 +106,7 @@ export function SlopStore({ onClose }: { onClose: () => void }) {
           <Section title="Time Warp" sub="instantly collect 4 hours of earnings">
             <button
               disabled={m.clout < TIME_WARP_COST}
-              onClick={() => dispatch({ type: 'TIME_WARP', cloutCost: TIME_WARP_COST })}
+              onClick={() => { sfx('payout'); dispatch({ type: 'TIME_WARP', cloutCost: TIME_WARP_COST }) }}
               className="w-full rounded-lg bg-zinc-800 hover:bg-zinc-700 disabled:bg-zinc-900 disabled:text-zinc-600 border border-zinc-700 text-zinc-100 text-sm font-semibold py-2.5"
             >
               ⏩ Skip ahead 4 hours · ✨{TIME_WARP_COST}

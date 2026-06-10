@@ -45,7 +45,11 @@ export const MODELS: Record<ModelId, ModelDef> = {
     id: 'free_image',
     name: 'Free MS Image Creator',
     tier: 1.0,
-    tags: ['ai_aesthetic'],
+    // No trend tags: the baseline model everyone runs must not make every
+    // recipe read "🔥 trending" whenever ai_aesthetic is hot — that polluted
+    // the topic picker into showing the same bonus on every option. Paid
+    // models keep their tags (riding a trend is part of what you pay for).
+    tags: [],
     flavor: "It's free, that's the whole pitch.",
   },
   gumroad_pack: {

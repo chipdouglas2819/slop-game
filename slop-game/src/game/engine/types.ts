@@ -256,6 +256,10 @@ export interface GameState {
   // Monetization SIMULATION (D11 — fake store, no real charges)
   monetization: MonetizationState
 
+  // Transient: tokens gained in the most recent Algorithm Update, for the
+  // post-reset celebration banner (null once dismissed)
+  lastPrestigeGain: number | null
+
   // Timestamps
   lastTickAt: number
   startedAt: number

@@ -7,7 +7,7 @@ const STORAGE_KEY = 'slop.save.v1'
 interface Serialized
   extends Omit<
     GameState,
-    'money' | 'engagements' | 'lifetimeE' | 'progression' | 'pages' | 'monetization'
+    'money' | 'engagements' | 'lifetimeE' | 'progression' | 'pages' | 'monetization' | 'lastPrestigeGain'
   > {
   money: string
   engagements: string
@@ -15,6 +15,7 @@ interface Serialized
   progression?: GameState['progression'] // optional — added after v1 shipped
   pages?: GameState['pages']
   monetization?: GameState['monetization'] // optional — added after v1 shipped
+  lastPrestigeGain?: number | null // optional — added after v1 shipped
   __version: 1
 }
 
@@ -51,6 +52,7 @@ function deserialize(s: Serialized): GameState {
     activeScandal: s.activeScandal ?? null,
     firedSignatureScandals: s.firedSignatureScandals ?? [],
     lastScandalResult: null,
+    lastPrestigeGain: s.lastPrestigeGain ?? null,
     scandalCooldownUntil: s.scandalCooldownUntil ?? 0,
     monetization: s.monetization ?? {
       clout: 0,

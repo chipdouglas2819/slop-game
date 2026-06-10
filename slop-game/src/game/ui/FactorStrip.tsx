@@ -2,7 +2,9 @@ import { useStore } from '../store'
 import {
   affinityBand,
   recipeKey,
+  SATURATION_OVERUSED_BELOW,
   saturationGauge,
+  saturationMult,
   slopScore,
   tacticBand,
   trendDirection,
@@ -12,12 +14,13 @@ import type { Recipe } from '../engine/types'
 
 // Plain-language "why this earns what it does" breakdown. No designer jargon:
 // Affinity→"Topic fit", TacticSynergy→"Tactic fit", Trend→"Trending",
-// Saturation→"Freshness". Bands shown as glyph + word (never color alone).
+// Saturation→"Freshness". Bands shown as stars + word (never color alone).
 export function FactorStrip({ recipe }: { recipe: Recipe }) {
   const { state } = useStore()
   const aff = affinityBand(state, recipe)
   const tac = tacticBand(recipe)
   const trend = trendDirection(recipe, state.trend)
+  const rawSat = saturationMult(state.saturation[recipeKey(recipe)])
   const fresh = saturationGauge(state.saturation[recipeKey(recipe)])
   const reach = slopScore(state, recipe).total
   const tacticUnlocked = state.progression.tacticChipUnlocked
@@ -44,7 +47,7 @@ export function FactorStrip({ recipe }: { recipe: Recipe }) {
             <span className="text-zinc-500">no</span>
           )}
         </span>
-        <Freshness value={fresh} />
+        <Freshness fresh={fresh} raw={rawSat} />
       </div>
     </div>
   )
@@ -54,25 +57,31 @@ function Factor({ label, glyph, word }: { label: string; glyph: string; word: st
   return (
     <span className="flex items-center gap-1">
       <span className="text-zinc-500">{label}</span>
-      <span className="text-zinc-100">{glyph} {word}</span>
+      <span className="text-zinc-100">
+        <span className="text-amber-300">{glyph}</span> {word}
+      </span>
     </span>
   )
 }
 
-function Freshness({ value }: { value: number }) {
+// Freshness gauge — fill is NORMALIZED (burned = empty) and the color agrees
+// with the "⚠ overused" warning so the two surfaces can never contradict.
+function Freshness({ fresh, raw }: { fresh: number; raw: number }) {
   const cells = 4
-  const filled = Math.round(value * cells)
-  const low = value < 0.6
+  const filled = Math.round(fresh * cells)
+  const color =
+    raw >= 0.85 ? 'text-emerald-400' : raw >= SATURATION_OVERUSED_BELOW ? 'text-amber-400' : 'text-red-400'
   return (
     <span className="flex items-center gap-1">
       <span className="text-zinc-500">Freshness</span>
       <span className="font-mono tracking-tight">
         {Array.from({ length: cells }).map((_, i) => (
-          <span key={i} className={i < filled ? (low ? 'text-orange-400' : 'text-emerald-400') : 'text-zinc-700'}>
+          <span key={i} className={i < filled ? color : 'text-zinc-700'}>
             ▓
           </span>
         ))}
       </span>
+      {raw < SATURATION_OVERUSED_BELOW && <span className="text-red-400">worn out</span>}
     </span>
   )
 }
