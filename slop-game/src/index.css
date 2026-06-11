@@ -129,6 +129,12 @@ input[type="range"] {
   50%, 100% { opacity: 0; }
 }
 
+/* ready-to-post bubble bob (transform only; centering lives on the parent) */
+@keyframes bubbleBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
 .svg-grow {
   transform-box: fill-box;
   transform-origin: 50% 100%;

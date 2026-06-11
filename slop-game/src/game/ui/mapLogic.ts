@@ -37,6 +37,18 @@ export function particleCount(units: number, manager: boolean): number {
   return units >= 200 ? 3 : 2
 }
 
+// Short lot names for the 9px nameplate strip — platform shortNames won't do
+// (the first three lots are all Goggle).
+export const SHORT_NAME: Record<string, string> = {
+  comment_spam: 'Spam Farm',
+  listicle_blog: 'Listicles',
+  recipe_page: 'Recipes',
+  facebook_page: 'Fakebook',
+  amazon_storefront: 'Amazoom',
+  tiktok_account: 'ClickClock',
+  linkedin_page: 'WorkedIn',
+}
+
 export const TOPIC_EMOJI: Record<TopicId, string> = {
   shrimp_jesus: '🦐',
   africa_boys: '🖼',
@@ -105,6 +117,14 @@ export type NextBestAction =
   | { kind: 'manager'; pageIdx: number }
   | { kind: 'buy'; pageIdx: number; count: number }
   | { kind: 'retune'; pageIdx: number }
+
+// Which lot a beacon action points at (null for scandal — that routes to the
+// interrupt card, not a lot).
+export function beaconTargetSlotId(state: GameState, action: NextBestAction | null): string | null {
+  if (!action || action.kind === 'scandal') return null
+  if (action.kind === 'unlock') return action.slotId
+  return state.pages[action.pageIdx]?.defId ?? null
+}
 
 export function nextBestAction(state: GameState): NextBestAction | null {
   // 1 — a live scandal outranks everything

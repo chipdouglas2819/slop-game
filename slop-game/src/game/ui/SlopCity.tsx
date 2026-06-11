@@ -1,22 +1,26 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { PAGE_SLOTS, managerCost } from '../engine/data'
+import { MILESTONES, PAGE_SLOTS, managerCost } from '../engine/data'
 import {
   effectiveCycleSec,
   era,
   recipeKey,
   SATURATION_OVERUSED_BELOW,
   saturationMult,
+  trendDirection,
   unitCost,
   nextMilestone,
   zombieRatio,
 } from '../engine/math'
-import { pageDollarsPerSec } from '../engine/state'
+import { pageDollarsPerSec, pageTapPayout } from '../engine/state'
+import { fmtMoney } from '../format'
 import {
+  beaconTargetSlotId,
   caption,
   litter,
   nextBestAction,
   particleCount,
+  SHORT_NAME,
   skyVars,
   TIER,
   tierOf,
@@ -24,33 +28,38 @@ import {
   zQuantize,
 } from './mapLogic'
 import { COLORS, EMOJI } from './PageCard'
-import { MapPopover } from './MapPopover'
-import type { MapTarget } from './MapPopover'
+import { MapDock } from './MapDock'
 import { sfx } from './sfx'
 
-// Slop City — the empire as a living city block at dusk. Buildings grow at
-// milestones and blink at the economy's tempo; posts rise into the Algorithm's
-// eye; the sky sickens and the sidewalk crowd turns robotic as Z climbs. One
-// gold beacon (at most) marks the next best action: tap the glowing thing.
+// Slop City — the map IS the game. Tapping a manual building publishes (the
+// existing TAP dispatch), with honest two-beat feedback: the ready bubble
+// deflates into a refilling progress pill on tap, and the +$ float fires when
+// the cycle actually pays. Managed/locked/vacant buildings select into the
+// persistent dock below. One gold beacon (at most) marks the next best action.
 const LOT_W = 351 / 7
 const VIEW_H = 168
 const GROUND_Y = 140
 
 const pct = (v: number, total: number) => `${(v / total) * 100}%`
 
-export function SlopCity() {
-  const { state } = useStore()
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem('slop.city.collapsed') === '1'
-    } catch {
-      return false
-    }
-  })
-  const [popover, setPopover] = useState<MapTarget | null>(null)
+interface Float {
+  id: number
+  lot: number
+  text: string
+}
+let floatSeq = 0
+
+export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) => void }) {
+  const { state, dispatch } = useStore()
+  const [sel, setSel] = useState<string | null>(null)
   const [blackout, setBlackout] = useState(false)
+  const [floats, setFloats] = useState<Float[]>([])
+  const [celebration, setCelebration] = useState<string | null>(null)
+  const [dud, setDud] = useState<{ lot: number; n: number } | null>(null)
+  const dudSeq = useRef(0)
   const prevEraGain = useRef<number | null>(state.lastEraJumpGain)
   const blackoutTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Pull-the-Plug blackout: only on an observed null→number transition while
   // mounted (never on reload with a pending banner). The un-blackout timer is
@@ -61,7 +70,7 @@ export function SlopCity() {
     prevEraGain.current = state.lastEraJumpGain
     if (was == null && state.lastEraJumpGain != null) {
       setBlackout(true)
-      setPopover(null)
+      setSel(null)
       if (blackoutTimer.current) clearTimeout(blackoutTimer.current)
       blackoutTimer.current = setTimeout(() => setBlackout(false), 2600)
     }
@@ -69,6 +78,7 @@ export function SlopCity() {
   useEffect(
     () => () => {
       if (blackoutTimer.current) clearTimeout(blackoutTimer.current)
+      if (celebrationTimer.current) clearTimeout(celebrationTimer.current)
     },
     [],
   )
@@ -82,10 +92,32 @@ export function SlopCity() {
     }
   })
 
-  const hasAnyUnit = state.pages.some((p) => p.units > 0)
-  // Keep rendering through the blackout — the plug wipes all units in the same
-  // dispatch that triggers the cinematic; bailing here would skip it entirely.
-  if (!hasAnyUnit && !blackout) return null
+  // ── teach captions: one-shot queue, 7s each, priority = arrival order ────
+  const [teachMsg, setTeachMsg] = useState<string | null>(null)
+  const teachQueue = useRef<string[]>([])
+  const teachBusy = useRef(false)
+  function pumpTeach() {
+    if (teachBusy.current) return
+    const next = teachQueue.current.shift()
+    if (!next) return
+    teachBusy.current = true
+    setTeachMsg(next)
+    setTimeout(() => {
+      teachBusy.current = false
+      setTeachMsg(null)
+      pumpTeach()
+    }, 7000)
+  }
+  function fireTeach(key: string, msg: string) {
+    try {
+      if (localStorage.getItem(key) === '1') return
+      localStorage.setItem(key, '1')
+    } catch {
+      return
+    }
+    teachQueue.current.push(msg)
+    pumpTeach()
+  }
 
   const gameEra = era(state)
   const zQ = zQuantize(zombieRatio(state))
@@ -93,13 +125,96 @@ export function SlopCity() {
   const robots = Math.round(zQ * 8)
   const trash = litter(state.lifetimeE.toNumber())
   const action = nextBestAction(state)
+  const targetSlot = beaconTargetSlotId(state, action)
+  const beaconLot = targetSlot ? PAGE_SLOTS.findIndex((s) => s.id === targetSlot) : -1
+  const selLot = sel ? PAGE_SLOTS.findIndex((s) => s.id === sel) : -1
 
-  // beacon → lot index (the scandal kind renders no ring — it routes to the
-  // interrupt card instead)
-  let beaconLot = -1
-  if (action && action.kind !== 'scandal') {
-    if (action.kind === 'unlock') beaconLot = PAGE_SLOTS.findIndex((s) => s.id === action.slotId)
-    else beaconLot = PAGE_SLOTS.findIndex((s) => s.id === state.pages[action.pageIdx]?.defId)
+  const anyOverused =
+    state.progression.topicChipUnlocked &&
+    state.pages.some(
+      (p) => p.units > 0 && saturationMult(state.saturation[recipeKey(p.recipe)]) < SATURATION_OVERUSED_BELOW,
+    )
+
+  // first city reveal / first robots / first smoke / first crackdown
+  useEffect(() => {
+    fireTeach('slop.city.teach.reveal', 'this is your empire. tap a building to post.')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (zQ >= 0.1) fireTeach('slop.city.teach.crowd', 'the sidewalk: your audience. the robots are yours.')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zQ])
+  useEffect(() => {
+    if (anyOverused) fireTeach('slop.city.teach.smoke', 'smoke = a worn-out topic. tap the building, then ⚙ Tune.')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyOverused])
+  useEffect(() => {
+    if (state.crackdown) fireTeach('slop.city.teach.crackdown', 'crackdown: that platform pays less until the bar runs out.')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.crackdown != null])
+
+  // the first-retune lesson needs the Tune button on screen — select the
+  // managed building once so the dock's spotlit ⚙ Tune is visible
+  const autoSelDone = useRef(false)
+  useEffect(() => {
+    if (autoSelDone.current) return
+    if (state.progression.topicChipUnlocked && !state.progression.firstRetuneDone) {
+      const i = state.pages.findIndex((p) => p.manager)
+      if (i >= 0) {
+        autoSelDone.current = true
+        setSel((s) => s ?? state.pages[i].defId)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.progression.topicChipUnlocked, state.progression.firstRetuneDone])
+
+  // ── always-mounted juice detectors (PageCards don't render in City view):
+  // +$ float + payout sfx on manual cycle completion; milestone + manager
+  // celebrations. Runs every tick over 7 pages — cheap.
+  const prevCycles = useRef<number[] | null>(null)
+  const prevUnits = useRef<number[] | null>(null)
+  const prevMgrs = useRef<boolean[] | null>(null)
+  useEffect(() => {
+    const pages = state.pages
+    if (prevCycles.current) {
+      for (let i = 0; i < pages.length; i++) {
+        const p = pages[i]
+        const pc = prevCycles.current[i] ?? 0
+        if (!p.manager && p.units > 0 && pc > 0 && p.cycleProgress === 0) {
+          const tap = pageTapPayout(state, i)
+          const net = tap.dollars - tap.modelCost
+          const id = ++floatSeq
+          const lot = PAGE_SLOTS.findIndex((s) => s.id === p.defId)
+          setFloats((f) => [...f, { id, lot, text: `${net < 0 ? '' : '+'}${fmtMoney(net)}` }])
+          setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 1200)
+          sfx('payout')
+        }
+        const pu = prevUnits.current?.[i] ?? p.units
+        if (p.units > pu) {
+          let crossed: number | null = null
+          for (const ms of MILESTONES) if (pu < ms && p.units >= ms) crossed = ms
+          if (crossed) {
+            const mult = crossed === 25 || crossed === 50 ? 3 : 2
+            celebrate(`🎉 ${SHORT_NAME[p.defId]} hit ×${crossed} — earns ×${mult} & posts 2× faster!`)
+            sfx('milestone')
+          }
+        }
+        const pm = prevMgrs.current?.[i] ?? p.manager
+        if (p.manager && !pm) {
+          celebrate('🧑‍💼 Manager hired — this building runs itself now.')
+          sfx('manager')
+        }
+      }
+    }
+    prevCycles.current = pages.map((p) => p.cycleProgress)
+    prevUnits.current = pages.map((p) => p.units)
+    prevMgrs.current = pages.map((p) => p.manager)
+  })
+
+  function celebrate(text: string) {
+    setCelebration(text)
+    if (celebrationTimer.current) clearTimeout(celebrationTimer.current)
+    celebrationTimer.current = setTimeout(() => setCelebration(null), 2600)
   }
 
   function markHintDone() {
@@ -112,63 +227,54 @@ export function SlopCity() {
     }
   }
 
-  function toggleCollapsed() {
-    const next = !collapsed
-    setCollapsed(next)
-    try {
-      localStorage.setItem('slop.city.collapsed', next ? '1' : '0')
-    } catch {
-      // fine
-    }
-  }
-
+  // ── THE tap rule: manual+ready → publish; everything else → inspect ──────
   function tapLot(lotIdx: number) {
     const slot = PAGE_SLOTS[lotIdx]
+    markHintDone()
     const pageIdx = state.pages.findIndex((p) => p.defId === slot.id)
-    markHintDone() // any map tap proves the lesson landed
-    // a scandal building routes to the existing interrupt — it stays the
-    // resolution surface
-    if (action?.kind === 'scandal' && pageIdx === action.pageIdx) {
+    const page = pageIdx >= 0 ? state.pages[pageIdx] : null
+    setSel(slot.id)
+    if (pageIdx >= 0 && state.activeScandal?.pageIdx === pageIdx) {
       document.getElementById('scandal-interrupt')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
-    sfx('uiOpen')
-    if (!state.unlockedSlots.includes(slot.id)) {
-      setPopover({ kind: 'locked', slotId: slot.id })
-    } else if (pageIdx >= 0) {
-      setPopover({ kind: 'page', pageIdx })
+    if (!state.unlockedSlots.includes(slot.id) || !page || page.units === 0 || page.manager) {
+      sfx('uiOpen')
+      return
+    }
+    if (page.cycleProgress === 0) {
+      sfx('tap')
+      dispatch({ type: 'TAP', pageIdx })
+    } else {
+      // engine ignores mid-cycle taps — acknowledge with a pill pulse, not the
+      // publish sound (a full sfx on a no-op would teach that sounds lie)
+      setDud({ lot: lotIdx, n: ++dudSeq.current })
     }
   }
 
-  if (collapsed) {
-    return (
-      <button
-        onClick={toggleCollapsed}
-        aria-expanded={false}
-        className="w-full flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-900/70 px-4 py-2 text-left"
-      >
-        <span className="text-[11px] italic text-zinc-500">🏙 your slop empire</span>
-        <span className="flex items-center gap-2">
-          {action && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 city-anim animate-[beaconPulse_1.6s_infinite]" />}
-          <span className="text-zinc-600 text-xs">▾</span>
-        </span>
-      </button>
-    )
+  // ready bubbles: rank by payout so only the two richest show amounts —
+  // adjacent 50px lots can't fit three full pills
+  const readyNet = new Map<number, number>()
+  for (let i = 0; i < state.pages.length; i++) {
+    const p = state.pages[i]
+    if (p.units > 0 && !p.manager && p.cycleProgress === 0) {
+      const t = pageTapPayout(state, i)
+      readyNet.set(i, t.dollars - t.modelCost)
+    }
   }
+  const amountRank = [...readyNet.entries()].sort((a, b) => b[1] - a[1]).map(([i]) => i)
 
-  // teach line only while an actual beacon ring is on screen
   const showHint = beaconLot >= 0 && !hintDone && !blackout
   const captionText = blackout
     ? 'you turned it off. it needed that.'
-    : showHint
-    ? 'tap the glowing thing.'
-    : caption(zQ)
+    : teachMsg ?? (showHint ? 'tap the glowing thing.' : caption(zQ))
 
   return (
     <div className="rounded-2xl border border-zinc-800 overflow-hidden bg-zinc-900/70">
       <div
         className="relative"
         style={{ '--sky-top': sky.top, '--sky-horizon': sky.horizon, '--core': sky.core } as React.CSSProperties}
+        onClick={() => setSel(null)}
       >
         <svg
           viewBox={`0 0 351 ${VIEW_H}`}
@@ -207,10 +313,10 @@ export function SlopCity() {
               return (
                 <g key={slot.id}>
                   <rect x={x} y={GROUND_Y - 26} width="38" height="26" fill="#101016" stroke={ready ? '#f59e0b' : '#3f3f46'} strokeDasharray="3 3" strokeWidth="1" />
-                  <text x={x + 19} y={GROUND_Y - 16} fontSize="8" textAnchor="middle">🏗</text>
+                  <text x={x + 19} y={GROUND_Y - 16} fontSize="8" textAnchor="middle" aria-hidden>🏗</text>
                   <g transform={`rotate(-6 ${x + 19} ${GROUND_Y - 8})`}>
-                    <text x={x + 19} y={GROUND_Y - 9} fontSize="5.5" textAnchor="middle" fill={tone}>ZONED FOR</text>
-                    <text x={x + 19} y={GROUND_Y - 3} fontSize="5.5" textAnchor="middle" fill={tone}>SLOP</text>
+                    <text x={x + 19} y={GROUND_Y - 9} fontSize="5.5" textAnchor="middle" fill={tone} aria-hidden>ZONED FOR</text>
+                    <text x={x + 19} y={GROUND_Y - 3} fontSize="5.5" textAnchor="middle" fill={tone} aria-hidden>SLOP</text>
                   </g>
                 </g>
               )
@@ -218,6 +324,17 @@ export function SlopCity() {
             const pageIdx = state.pages.findIndex((p) => p.defId === slot.id)
             const page = state.pages[pageIdx]
             if (!page) return null
+            if (page.units === 0) {
+              // vacant lot — the post-prestige rebuild path lives here
+              return (
+                <g key={`${slot.id}-vacant`} opacity={0.8}>
+                  <rect x={x} y={GROUND_Y - 14} width="38" height="14" fill="none" stroke="#3f3f46" strokeDasharray="2 3" strokeWidth="1" />
+                  <text x={x + 19} y={GROUND_Y - 4} fontSize="7" textAnchor="middle" opacity={0.5} aria-hidden>
+                    {EMOJI[slot.platform]}
+                  </text>
+                </g>
+              )
+            }
             const tier = tierOf(page.units)
             const t = TIER[tier]
             const losing = page.manager && pageDollarsPerSec(state, pageIdx) < 0
@@ -254,7 +371,6 @@ export function SlopCity() {
                 doorLit={affordable}
                 blinkSec={blinkSec}
                 billboard={tier >= 7 ? TOPIC_EMOJI[page.recipe.topic] : ''}
-                sign={EMOJI[slot.platform]}
                 scandal={scandalHere}
                 crackdown={crackdownHere}
                 dying={blackout}
@@ -264,7 +380,7 @@ export function SlopCity() {
           })}
         </svg>
 
-        {/* DOM overlay: pips, particles, beacon, crowd, litter, tap targets */}
+        {/* DOM overlay: tap targets, pills, floats, pips, particles, beacon */}
         <div className="absolute inset-0 pointer-events-none">
           {PAGE_SLOTS.map((slot, i) => {
             const locked = !state.unlockedSlots.includes(slot.id)
@@ -274,10 +390,11 @@ export function SlopCity() {
             const h = TIER[tier].h
             const centerPct = pct(i * LOT_W + LOT_W / 2, 351)
             const roofBottom = pct(VIEW_H - GROUND_Y + h + 8, VIEW_H)
+            // pill anchor: above the roof, clamped clear of the Core's eye
+            const pillBottom = pct(VIEW_H - GROUND_Y + Math.min(h + 7, 102), VIEW_H)
 
-            // exactly one pip per lot, by priority. The finger waits for
-            // firstTapDone so it never competes with Onboarding's pointer.
-            let pip: 'scandal' | 'smoke' | 'finger' | null = null
+            // one ambient pip per lot: scandal siren or overuse smoke
+            let pip: 'scandal' | 'smoke' | null = null
             if (page) {
               if (state.activeScandal?.pageIdx === pageIdx) pip = 'scandal'
               else if (
@@ -286,14 +403,12 @@ export function SlopCity() {
                 saturationMult(state.saturation[recipeKey(page.recipe)]) < SATURATION_OVERUSED_BELOW
               )
                 pip = 'smoke'
-              else if (
-                page.units > 0 &&
-                !page.manager &&
-                page.cycleProgress === 0 &&
-                state.progression.firstTapDone
-              )
-                pip = 'finger'
             }
+
+            const manual = !!page && page.units > 0 && !page.manager
+            const ready = manual && page.cycleProgress === 0
+            const net = readyNet.get(pageIdx) ?? 0
+            const showAmount = ready && amountRank.indexOf(pageIdx) < 2
 
             const crackdownHere =
               state.crackdown != null &&
@@ -302,16 +417,73 @@ export function SlopCity() {
 
             return (
               <span key={slot.id}>
-                {/* tap target */}
+                {/* tap target — full lot column */}
                 <button
-                  onClick={() => tapLot(i)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    tapLot(i)
+                  }}
                   className="absolute pointer-events-auto"
-                  style={{ left: pct(i * LOT_W, 351), width: pct(LOT_W, 351), top: '12%', bottom: 0 }}
-                  aria-label={locked ? `${slot.name} (locked)` : slot.name}
+                  style={{ left: pct(i * LOT_W, 351), width: pct(LOT_W, 351), top: '10%', bottom: 0 }}
+                  aria-label={
+                    locked
+                      ? `${slot.name} (locked)`
+                      : ready
+                      ? `${slot.name} — publish`
+                      : slot.name
+                  }
                 />
-                {/* status pip — outer span positions, inner span animates:
-                    fingerBob/smokePuff drive `transform`, so the centering
-                    translateX must live on a separate element */}
+
+                {/* READY BUBBLE → tap me; or PROGRESS PILL → cooking */}
+                {ready && (
+                  <span
+                    aria-hidden
+                    className="absolute"
+                    style={{ left: centerPct, bottom: pillBottom, transform: 'translateX(-50%)' }}
+                  >
+                    <span
+                      className={`inline-block city-anim rounded-full font-mono font-semibold shadow-lg border whitespace-nowrap ${
+                        net < 0
+                          ? 'bg-red-950/95 border-red-400/70 text-red-200'
+                          : 'bg-emerald-700/95 border-emerald-300/70 text-white'
+                      } ${showAmount ? 'text-[10px] px-1.5 py-0.5' : 'text-[10px] px-1 py-0.5'}`}
+                      style={{ animation: 'bubbleBob 1.4s ease-in-out infinite' }}
+                    >
+                      {showAmount ? `${net < 0 ? '' : '+'}${fmtMoney(net)}` : '$'}
+                    </span>
+                  </span>
+                )}
+                {manual && !ready && (
+                  <span
+                    aria-hidden
+                    key={dud && dud.lot === i ? `pp-${i}-${dud.n}` : `pp-${i}`}
+                    className={`absolute ${dud && dud.lot === i ? 'animate-[flashPop_220ms_ease-out]' : ''}`}
+                    style={{ left: centerPct, bottom: pillBottom, transform: 'translateX(-50%)' }}
+                  >
+                    <span className="block w-9 h-[5px] rounded-full bg-zinc-900/90 border border-zinc-600 overflow-hidden">
+                      <span
+                        className="block h-full bg-emerald-400"
+                        style={{ width: `${Math.min(100, page!.cycleProgress * 100)}%`, transition: 'width 90ms linear' }}
+                      />
+                    </span>
+                  </span>
+                )}
+
+                {/* payout floats — fired by the cycle-completion detector */}
+                {floats
+                  .filter((f) => f.lot === i)
+                  .map((f) => (
+                    <span
+                      key={f.id}
+                      aria-hidden
+                      className="absolute font-mono font-bold text-emerald-300 text-xs animate-[floatUp_1.1s_ease-out_forwards] whitespace-nowrap"
+                      style={{ left: centerPct, bottom: roofBottom, transform: 'translateX(-50%)' }}
+                    >
+                      {f.text}
+                    </span>
+                  ))}
+
+                {/* ambient pip */}
                 {pip === 'scandal' && (
                   <span
                     aria-hidden
@@ -331,17 +503,8 @@ export function SlopCity() {
                     </span>
                   </>
                 )}
-                {pip === 'finger' && (
-                  <span
-                    aria-hidden
-                    className="absolute text-[12px]"
-                    style={{ left: centerPct, bottom: roofBottom, transform: 'translateX(-50%)' }}
-                  >
-                    <span className="inline-block city-anim" style={{ animation: 'fingerBob 1.2s infinite' }}>👆</span>
-                  </span>
-                )}
-                {/* post particles — only while something is actually posting;
-                    base opacity 0 so reduced-motion shows nothing parked */}
+
+                {/* post particles — only while something is actually posting */}
                 {page &&
                   page.units > 0 &&
                   (page.manager || page.cycleProgress > 0) &&
@@ -362,6 +525,7 @@ export function SlopCity() {
                       {TOPIC_EMOJI[page.recipe.topic]}
                     </span>
                   ))}
+
                 {/* crackdown: police at the curb */}
                 {crackdownHere && (
                   <span aria-hidden className="absolute text-[10px]" style={{ left: centerPct, bottom: '3%', transform: 'translateX(-50%)' }}>
@@ -371,6 +535,25 @@ export function SlopCity() {
               </span>
             )
           })}
+
+          {/* selection ring (suppressed when the beacon already rings the lot) */}
+          {selLot >= 0 && selLot !== beaconLot && !blackout && (
+            <span
+              aria-hidden
+              className="absolute rounded-xl border-2 border-zinc-300/50"
+              style={{
+                left: pct(selLot * LOT_W + 3, 351),
+                width: pct(44, 351),
+                bottom: pct(24, VIEW_H),
+                height: pct(
+                  (state.unlockedSlots.includes(PAGE_SLOTS[selLot].id)
+                    ? TIER[tierOf(state.pages.find((p) => p.defId === PAGE_SLOTS[selLot].id)?.units ?? 0)].h
+                    : 20) + 16,
+                  VIEW_H,
+                ),
+              }}
+            />
+          )}
 
           {/* THE gold beacon — at most one on the whole map */}
           {beaconLot >= 0 && (
@@ -427,6 +610,15 @@ export function SlopCity() {
             </span>
           ))}
 
+          {/* celebration toast (milestones / managers) */}
+          {celebration && (
+            <div className="absolute inset-x-2 top-2 z-10 flex justify-center pointer-events-none">
+              <div className="bg-black/80 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-50 font-semibold animate-[flashPop_300ms_ease-out] text-center">
+                {celebration}
+              </div>
+            </div>
+          )}
+
           {/* blackout */}
           {blackout && (
             <div className="absolute inset-0 bg-black city-anim" style={{ animation: 'flashPop 600ms ease-in 400ms both' }} />
@@ -434,36 +626,70 @@ export function SlopCity() {
         </div>
       </div>
 
-      {/* caption row — hint goes amber so it visually rhymes with the beacon */}
-      <div className="px-3 py-0.5 flex items-center justify-between border-t border-zinc-800/60">
-        <span className={`text-[11px] italic ${showHint ? 'text-amber-300/90' : 'text-zinc-400'}`}>
-          {captionText}
-        </span>
-        <button
-          onClick={toggleCollapsed}
-          className="text-zinc-500 text-xs px-3 py-2"
-          aria-label="Collapse map"
-          aria-expanded={true}
-        >
-          ▴
-        </button>
+      {/* nameplate strip — every lot labeled, always legible, tappable */}
+      <div className="flex border-t border-zinc-800/60">
+        {PAGE_SLOTS.map((slot, i) => {
+          const locked = !state.unlockedSlots.includes(slot.id)
+          const pageIdx = state.pages.findIndex((p) => p.defId === slot.id)
+          const page = pageIdx >= 0 ? state.pages[pageIdx] : null
+          const isSel = sel === slot.id
+          let line1: string
+          let line2: string
+          let tone = 'text-zinc-400'
+          if (locked) {
+            const cashOk = state.money.gte(slot.unlock.cash ?? 0)
+            const eOk = !slot.unlock.lifetimeE || state.lifetimeE.gte(slot.unlock.lifetimeE)
+            line1 = `🔒 ${SHORT_NAME[slot.id]}`
+            line2 = fmtMoney(slot.unlock.cash ?? 0)
+            tone = cashOk && eOk ? 'text-amber-300' : 'text-zinc-600'
+          } else if (!page || page.units === 0) {
+            line1 = `${EMOJI[slot.platform]} ${SHORT_NAME[slot.id]}`
+            line2 = 'vacant'
+            tone = 'text-zinc-500'
+          } else {
+            const hot = trendDirection(page.recipe, state.trend) === 'hot'
+            line1 = `${EMOJI[slot.platform]} ${SHORT_NAME[slot.id]}`
+            line2 = `×${page.units}${hot ? ' 🔥' : ''}`
+            tone = 'text-zinc-300'
+          }
+          return (
+            <button
+              key={slot.id}
+              onClick={() => tapLot(i)}
+              className={`flex-1 min-w-0 px-0.5 py-1 text-center leading-tight ${
+                isSel ? 'bg-zinc-800/80' : ''
+              }`}
+            >
+              <span className={`block text-[9px] truncate ${isSel ? 'text-zinc-100' : tone}`}>{line1}</span>
+              <span className={`block text-[8px] truncate ${isSel ? 'text-zinc-300' : 'text-zinc-600'}`}>{line2}</span>
+            </button>
+          )
+        })}
       </div>
 
-      {popover && <MapPopover target={popover} recommended={recommendedFor(action, popover)} onClose={() => setPopover(null)} />}
+      {/* caption row — teach lines > beacon hint > the deadpan Z ladder */}
+      <div className="px-3 py-1 border-t border-zinc-800/60">
+        <span
+          className={`text-[11px] italic ${
+            teachMsg ? 'text-fuchsia-200' : showHint ? 'text-amber-300/90' : 'text-zinc-400'
+          }`}
+        >
+          {captionText}
+        </span>
+      </div>
+
+      <MapDock
+        selected={sel}
+        action={action}
+        onSelect={(slotId) => {
+          markHintDone()
+          setSel(slotId)
+        }}
+        onDeselect={() => setSel(null)}
+        onOpenDetails={onOpenDetails}
+      />
     </div>
   )
-}
-
-function recommendedFor(
-  action: ReturnType<typeof nextBestAction>,
-  popover: MapTarget,
-): 'buy' | 'manager' | 'unlock' | 'retune' | null {
-  if (!action) return null
-  if (popover.kind === 'locked') return action.kind === 'unlock' && action.slotId === popover.slotId ? 'unlock' : null
-  if (action.kind === 'manager' && action.pageIdx === popover.pageIdx) return 'manager'
-  if (action.kind === 'buy' && action.pageIdx === popover.pageIdx) return 'buy'
-  if (action.kind === 'retune' && action.pageIdx === popover.pageIdx) return 'retune'
-  return null
 }
 
 // 90s purge countdown bar under the affected district — duration computed once
@@ -504,7 +730,6 @@ interface BuildingProps {
   doorLit: boolean
   blinkSec: number
   billboard: string
-  sign: string
   scandal: boolean
   crackdown: boolean
   dying: boolean
@@ -525,7 +750,6 @@ const Building = memo(function Building({
   doorLit,
   blinkSec,
   billboard,
-  sign,
   scandal,
   crackdown,
   dying,
@@ -595,10 +819,6 @@ const Building = memo(function Building({
       </g>
       {/* door */}
       <rect x={x + 16.5} y={GROUND_Y - 7} width={5} height={7} fill={doorLit ? '#f59e0b' : '#1f1f28'} />
-      {/* platform emoji as the street sign */}
-      <text x={x + 2} y={GROUND_Y - 1.5} fontSize="6" aria-hidden>
-        {sign}
-      </text>
       {/* tier ornaments */}
       {tier >= 4 && <line x1={x + 19} y1={top} x2={x + 19} y2={top - 7} stroke="#71717a" strokeWidth={1.5} />}
       {tier >= 5 && <rect x={x + 27} y={top + 4} width={8} height={4} fill={color} opacity={0.9} />}
@@ -611,7 +831,7 @@ const Building = memo(function Building({
       {tier >= 7 && billboard && (
         <>
           <rect x={x + 13} y={top - 12} width={12} height={9} fill="#0b0b10" stroke="#52525b" strokeWidth={0.5} />
-          <text x={x + 19} y={top - 4.5} fontSize="7" textAnchor="middle">
+          <text x={x + 19} y={top - 4.5} fontSize="7" textAnchor="middle" aria-hidden>
             {billboard}
           </text>
         </>

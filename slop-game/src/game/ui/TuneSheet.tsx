@@ -32,10 +32,12 @@ type Axis = 'topic' | 'tactic' | 'model'
 export function TuneSheet({ pageIdx, onClose }: { pageIdx: number; onClose: () => void }) {
   const { state, dispatch } = useStore()
   useLockBodyScroll()
-  const page = state.pages[pageIdx]
-  const slot = PAGE_SLOT_BY_ID[page.defId]
+  const page = state.pages[pageIdx] as (typeof state.pages)[number] | undefined
   const [axis, setAxis] = useState<Axis>('topic')
   const gameEra = era(state)
+  // a prestige can wipe the page out from under an open sheet
+  if (!page) return null
+  const slot = PAGE_SLOT_BY_ID[page.defId]
 
   const tabs: Array<{ id: Axis; label: string }> = [
     { id: 'topic', label: 'What to post' },
