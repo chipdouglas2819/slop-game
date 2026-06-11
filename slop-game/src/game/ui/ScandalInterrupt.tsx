@@ -29,7 +29,10 @@ export function ScandalInterrupt() {
   const satFilled = Math.round(hints.saturation * cells)
 
   return (
-    <div className="border-2 border-orange-500 rounded-2xl overflow-hidden bg-gradient-to-b from-orange-950/60 to-zinc-900 animate-[slideDown_300ms_ease-out]">
+    <div
+      id="scandal-interrupt"
+      className="border-2 border-orange-500 rounded-2xl overflow-hidden bg-gradient-to-b from-orange-950/60 to-zinc-900 animate-[slideDown_300ms_ease-out]"
+    >
       <div className="px-4 pt-3 pb-2">
         <div className="text-[10px] uppercase tracking-widest text-orange-400 font-semibold">
           ⚡ Goes Mainstream

@@ -7,6 +7,7 @@ import { EraBanner } from './EraBanner'
 import { AftermathBanner } from './AftermathBanner'
 import { CrackdownBanner } from './CrackdownBanner'
 import { SplashCard } from './SplashCard'
+import { SlopCity } from './SlopCity'
 
 // The single Feed scroll (§10) — banners + page cards + the next-slot teaser.
 // A scandal interrupt (when armed) pins to the top of the Feed. The
@@ -23,6 +24,7 @@ export function Feed() {
       {state.activeScandal && <ScandalInterrupt />}
       <AftermathBanner />
       <CrackdownBanner />
+      <SlopCity />
       {state.pages.map((_, i) => (
         <PageCard key={i} pageIdx={i} />
       ))}

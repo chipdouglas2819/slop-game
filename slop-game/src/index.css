@@ -46,3 +46,97 @@ input[type="range"] {
   0%   { transform: scale(0.85); opacity: 0; }
   100% { transform: scale(1);    opacity: 1; }
 }
+
+/* ── Slop City (the map) ──────────────────────────────────────────────── */
+
+/* posts rising from buildings into the Core */
+@keyframes slopRise {
+  0%   { transform: translate(0, 0);              opacity: 0; }
+  12%  { opacity: 0.9; }
+  100% { transform: translate(var(--drift, 0px), -86px); opacity: 0; }
+}
+
+/* lit-window shimmer */
+@keyframes winFlicker {
+  0%, 92%, 100% { opacity: 0.9; }
+  95%           { opacity: 0.5; }
+}
+
+/* overused roof smoke */
+@keyframes smokePuff {
+  0%   { transform: translateY(0) scale(0.7);   opacity: 0; }
+  25%  { opacity: 0.5; }
+  100% { transform: translateY(-14px) scale(1.3); opacity: 0; }
+}
+
+/* THE one gold next-best-action beacon (transform/opacity only) */
+@keyframes beaconPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.85; }
+  50%      { transform: scale(1.05); opacity: 1; }
+}
+
+/* roof beacon blinking at the page's cycle tempo */
+@keyframes roofBlink {
+  0%, 49%  { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+
+/* crackdown district strobe */
+@keyframes crackStrobe {
+  0%, 100% { opacity: 0.18; }
+  50%      { opacity: 0.5; }
+}
+
+/* crackdown countdown drain (scaleX 1→0 over the inline duration) */
+@keyframes sweepDrain {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+/* sidewalk crowd idle shuffle */
+@keyframes crowdShuffle {
+  from { transform: translateX(-5px); }
+  to   { transform: translateX(5px); }
+}
+
+/* "needs your tap" finger bob */
+@keyframes fingerBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+/* losing-money window flicker */
+@keyframes redFlicker {
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 0.35; }
+}
+
+/* milestone level-up pop (remounted per tier) */
+@keyframes buildingGrow {
+  0%   { transform: scaleY(0.86); }
+  60%  { transform: scaleY(1.04); }
+  100% { transform: scaleY(1); }
+}
+
+/* Pull-the-Plug blackout: windows die */
+@keyframes blackoutWin {
+  to { opacity: 0; }
+}
+
+/* lone terminal cursor on the dead street */
+@keyframes cursorBlink {
+  0%, 49%  { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.svg-grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+/* decorative loops off for reduced-motion users; status stays color-static */
+@media (prefers-reduced-motion: reduce) {
+  .city-anim {
+    animation: none !important;
+  }
+}

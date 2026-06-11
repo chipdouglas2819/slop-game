@@ -43,6 +43,22 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   const [celebration, setCelebration] = useState<string | null>(null)
   const [rateFlash, setRateFlash] = useState<string | null>(null)
   const [floats, setFloats] = useState<Float[]>([])
+  const [focusFlash, setFocusFlash] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  // The map's "Details ↓" hands off here: expand, scroll into view, flash.
+  useEffect(() => {
+    function onFocus(e: Event) {
+      const detail = (e as CustomEvent<{ pageIdx: number }>).detail
+      if (detail?.pageIdx !== pageIdx) return
+      setExpanded(true)
+      rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFocusFlash(true)
+      setTimeout(() => setFocusFlash(false), 1400)
+    }
+    window.addEventListener('slop:focus-page', onFocus)
+    return () => window.removeEventListener('slop:focus-page', onFocus)
+  }, [pageIdx])
 
   const chipsUnlocked = state.progression.topicChipUnlocked
   const cycleSec = effectiveCycleSec(slot, page.units)
@@ -144,7 +160,12 @@ export function PageCard({ pageIdx }: { pageIdx: number }) {
   }
 
   return (
-    <div className="relative bg-zinc-900/70 border border-zinc-800 rounded-2xl overflow-hidden">
+    <div
+      ref={rootRef}
+      className={`relative bg-zinc-900/70 border rounded-2xl overflow-hidden ${
+        focusFlash ? 'border-amber-400 ring-2 ring-amber-400' : 'border-zinc-800'
+      }`}
+    >
       {/* HEADER — the collapsed glance row */}
       <button onClick={() => setExpanded((e) => !e)} className="w-full text-left px-4 pt-3 pb-2">
         <div className="flex items-center gap-3">
@@ -320,7 +341,7 @@ function PlatformAvatar({ id }: { id: PlatformId }) {
   )
 }
 
-const COLORS: Record<PlatformId, string> = {
+export const COLORS: Record<PlatformId, string> = {
   facebook: '#1d4ed8',
   amazon: '#b45309',
   spotify: '#15803d',
@@ -330,7 +351,7 @@ const COLORS: Record<PlatformId, string> = {
   linkedin: '#1e3a8a',
 }
 
-const EMOJI: Record<PlatformId, string> = {
+export const EMOJI: Record<PlatformId, string> = {
   facebook: '👴',
   amazon: '📦',
   spotify: '🎵',
