@@ -79,6 +79,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
     () => () => {
       if (blackoutTimer.current) clearTimeout(blackoutTimer.current)
       if (celebrationTimer.current) clearTimeout(celebrationTimer.current)
+      if (teachTimer.current) clearTimeout(teachTimer.current)
     },
     [],
   )
@@ -92,17 +93,26 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
     }
   })
 
-  // ── teach captions: one-shot queue, 7s each, priority = arrival order ────
+  // ── teach captions: one-shot queue, 7s each, priority = arrival order.
+  // The seen-flag is written at DISPLAY time, not enqueue — a caption queued
+  // when the city unmounts must come back next mount, not burn unseen.
   const [teachMsg, setTeachMsg] = useState<string | null>(null)
-  const teachQueue = useRef<string[]>([])
+  const teachQueue = useRef<Array<{ key: string; msg: string }>>([])
+  const teachQueued = useRef<Set<string>>(new Set())
   const teachBusy = useRef(false)
+  const teachTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   function pumpTeach() {
     if (teachBusy.current) return
     const next = teachQueue.current.shift()
     if (!next) return
     teachBusy.current = true
-    setTeachMsg(next)
-    setTimeout(() => {
+    try {
+      localStorage.setItem(next.key, '1')
+    } catch {
+      // fine
+    }
+    setTeachMsg(next.msg)
+    teachTimer.current = setTimeout(() => {
       teachBusy.current = false
       setTeachMsg(null)
       pumpTeach()
@@ -111,11 +121,12 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
   function fireTeach(key: string, msg: string) {
     try {
       if (localStorage.getItem(key) === '1') return
-      localStorage.setItem(key, '1')
     } catch {
       return
     }
-    teachQueue.current.push(msg)
+    if (teachQueued.current.has(key)) return
+    teachQueued.current.add(key)
+    teachQueue.current.push({ key, msg })
     pumpTeach()
   }
 
@@ -145,7 +156,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zQ])
   useEffect(() => {
-    if (anyOverused) fireTeach('slop.city.teach.smoke', 'smoke = a worn-out topic. tap the building, then ⚙ Tune.')
+    if (anyOverused) fireTeach('slop.city.teach.smoke', 'smoke = a worn-out topic. select the building, then ⚙ Tune it.')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [anyOverused])
   useEffect(() => {
@@ -229,6 +240,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
 
   // ── THE tap rule: manual+ready → publish; everything else → inspect ──────
   function tapLot(lotIdx: number) {
+    if (blackout) return // the cinematic is not a control surface
     const slot = PAGE_SLOTS[lotIdx]
     markHintDone()
     const pageIdx = state.pages.findIndex((p) => p.defId === slot.id)
@@ -244,6 +256,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
     }
     if (page.cycleProgress === 0) {
       sfx('tap')
+      setDud(null) // a real publish must never replay the no-op pulse
       dispatch({ type: 'TAP', pageIdx })
     } else {
       // engine ignores mid-cycle taps — acknowledge with a pill pulse, not the
@@ -425,12 +438,17 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
                   }}
                   className="absolute pointer-events-auto"
                   style={{ left: pct(i * LOT_W, 351), width: pct(LOT_W, 351), top: '10%', bottom: 0 }}
+                  aria-pressed={sel === slot.id}
                   aria-label={
                     locked
                       ? `${slot.name} (locked)`
+                      : !page || page.units === 0
+                      ? `${slot.name} — vacant lot`
+                      : page.manager
+                      ? `${slot.name} — managed, auto-posting`
                       : ready
                       ? `${slot.name} — publish`
-                      : slot.name
+                      : `${slot.name} — posting, ${Math.round(page.cycleProgress * 100)}%`
                   }
                 />
 
@@ -457,7 +475,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
                   <span
                     aria-hidden
                     key={dud && dud.lot === i ? `pp-${i}-${dud.n}` : `pp-${i}`}
-                    className={`absolute ${dud && dud.lot === i ? 'animate-[flashPop_220ms_ease-out]' : ''}`}
+                    className={`absolute ${dud && dud.lot === i ? 'animate-[flashPop_220ms_ease-out] motion-reduce:animate-none' : ''}`}
                     style={{ left: centerPct, bottom: pillBottom, transform: 'translateX(-50%)' }}
                   >
                     <span className="block w-9 h-[5px] rounded-full bg-zinc-900/90 border border-zinc-600 overflow-hidden">
@@ -496,10 +514,10 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
                 {pip === 'smoke' && (
                   <>
                     <span aria-hidden className="absolute text-[8px] text-zinc-400" style={{ left: centerPct, bottom: roofBottom, transform: 'translateX(-70%)' }}>
-                      <span className="inline-block city-anim" style={{ opacity: 0, animation: 'smokePuff 2.4s infinite' }}>💨</span>
+                      <span className="inline-block city-anim city-smoke" style={{ opacity: 0, animation: 'smokePuff 2.4s infinite' }}>💨</span>
                     </span>
                     <span aria-hidden className="absolute text-[8px] text-zinc-500" style={{ left: centerPct, bottom: roofBottom, transform: 'translateX(-10%)' }}>
-                      <span className="inline-block city-anim" style={{ opacity: 0, animation: 'smokePuff 2.4s infinite', animationDelay: '-1.2s' }}>💨</span>
+                      <span className="inline-block city-anim city-smoke" style={{ opacity: 0, animation: 'smokePuff 2.4s infinite', animationDelay: '-1.2s' }}>💨</span>
                     </span>
                   </>
                 )}
@@ -613,7 +631,10 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
           {/* celebration toast (milestones / managers) */}
           {celebration && (
             <div className="absolute inset-x-2 top-2 z-10 flex justify-center pointer-events-none">
-              <div className="bg-black/80 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-50 font-semibold animate-[flashPop_300ms_ease-out] text-center">
+              <div
+                role="status"
+                className="bg-black/80 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-zinc-50 font-semibold animate-[flashPop_300ms_ease-out] text-center"
+              >
                 {celebration}
               </div>
             </div>
@@ -656,6 +677,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
             <button
               key={slot.id}
               onClick={() => tapLot(i)}
+              aria-pressed={isSel}
               className={`flex-1 min-w-0 px-0.5 py-1 text-center leading-tight ${
                 isSel ? 'bg-zinc-800/80' : ''
               }`}
@@ -668,7 +690,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
       </div>
 
       {/* caption row — teach lines > beacon hint > the deadpan Z ladder */}
-      <div className="px-3 py-1 border-t border-zinc-800/60">
+      <div className="px-3 py-1 border-t border-zinc-800/60" aria-live="polite">
         <span
           className={`text-[11px] italic ${
             teachMsg ? 'text-fuchsia-200' : showHint ? 'text-amber-300/90' : 'text-zinc-400'
@@ -682,6 +704,7 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
         selected={sel}
         action={action}
         onSelect={(slotId) => {
+          if (blackout) return
           markHintDone()
           setSel(slotId)
         }}
@@ -692,11 +715,13 @@ export function SlopCity({ onOpenDetails }: { onOpenDetails: (pageIdx: number) =
   )
 }
 
-// 90s purge countdown bar under the affected district — duration computed once
-// at mount, keyed on untilMs so it never restarts. NOT .city-anim: this is
-// status, not decoration — a frozen full bar would misreport the countdown.
+// 90s purge countdown bar under the affected district. Crackdowns are always
+// 90s (state.ts), so the animation runs the FULL duration with a negative
+// delay — exact at any mount time, surviving view-toggle remounts that a
+// remaining-time-from-full bar would misreport. NOT .city-anim: this is
+// status, not decoration.
 function CrackdownSweep({ untilMs, lots }: { untilMs: number; lots: number[] }) {
-  const [secs] = useState(() => Math.max(1, (untilMs - Date.now()) / 1000))
+  const [delaySec] = useState(() => -Math.max(0, 90 - (untilMs - Date.now()) / 1000))
   if (lots.length === 0) return null
   const left = Math.min(...lots) * LOT_W
   const width = (Math.max(...lots) - Math.min(...lots) + 1) * LOT_W
@@ -709,7 +734,8 @@ function CrackdownSweep({ untilMs, lots }: { untilMs: number; lots: number[] }) 
         bottom: 0,
         height: 2,
         transformOrigin: 'left',
-        animation: `sweepDrain ${secs.toFixed(1)}s linear forwards`,
+        animation: 'sweepDrain 90s linear forwards',
+        animationDelay: `${delaySec.toFixed(1)}s`,
       }}
     />
   )

@@ -38,11 +38,12 @@ export function particleCount(units: number, manager: boolean): number {
 }
 
 // Short lot names for the 9px nameplate strip — platform shortNames won't do
-// (the first three lots are all Goggle).
+// (the first three lots are all Goggle). Each is a recognizable fragment of
+// slot.name so the nameplate, navigator, and dock header never disagree.
 export const SHORT_NAME: Record<string, string> = {
-  comment_spam: 'Spam Farm',
-  listicle_blog: 'Listicles',
-  recipe_page: 'Recipes',
+  comment_spam: 'Spam',
+  listicle_blog: 'Listicle',
+  recipe_page: 'Recipe',
   facebook_page: 'Fakebook',
   amazon_storefront: 'Amazoom',
   tiktok_account: 'ClickClock',

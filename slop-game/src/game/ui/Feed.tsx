@@ -29,9 +29,21 @@ export function Feed() {
     }
   })
   const [pendingFocus, setPendingFocus] = useState<number | null>(null)
+  const [peek, setPeek] = useState(false)
 
   const revealed = state.progression.firstTapDone && state.lifetimeE.gt(0)
-  const view: 'city' | 'pages' = revealed ? viewPref : 'pages'
+  // The reveal must NOT land on the same commit as the first payout — that
+  // would unmount PageCard before its +$ float/sfx effect runs and swallow
+  // the game's most important feedback beat. Hold the cards ~1.6s first.
+  const [cityLive, setCityLive] = useState(revealed)
+  useEffect(() => {
+    if (revealed && !cityLive) {
+      const t = setTimeout(() => setCityLive(true), 1600)
+      return () => clearTimeout(t)
+    }
+    if (!revealed && cityLive) setCityLive(false) // HARD_RESET → back to tutorial
+  }, [revealed, cityLive])
+  const view: 'city' | 'pages' = cityLive ? viewPref : 'pages'
 
   // The dock's "full details →" handoff: switch view first, THEN fire the
   // focus event — PageCard's listeners attach in child effects, which run
@@ -44,6 +56,7 @@ export function Feed() {
 
   function choose(v: 'city' | 'pages', persist = true) {
     setViewPref(v)
+    setPeek(false)
     if (persist) {
       try {
         localStorage.setItem('slop.city.view', v)
@@ -53,9 +66,11 @@ export function Feed() {
     }
   }
 
-  // a details visit is a peek, not a preference — never persisted
+  // a details visit is a peek, not a preference — never persisted, and it
+  // gets a floating way back (the focus scroll pushes the toggle off-screen)
   function openDetails(pageIdx: number) {
     choose('pages', false)
+    setPeek(true)
     setPendingFocus(pageIdx)
   }
 
@@ -68,7 +83,7 @@ export function Feed() {
       <AftermathBanner />
       <CrackdownBanner />
 
-      {revealed && (
+      {cityLive && (
         <div className="flex gap-1 bg-zinc-900/70 border border-zinc-800 rounded-xl p-1 text-xs">
           <button
             onClick={() => choose('city')}
@@ -91,7 +106,7 @@ export function Feed() {
         </div>
       )}
 
-      {revealed && view === 'city' ? (
+      {cityLive && view === 'city' ? (
         <SlopCity onOpenDetails={openDetails} />
       ) : (
         <>
@@ -100,6 +115,15 @@ export function Feed() {
           ))}
           {hasAnyUnit && <LockedSlotCard />}
         </>
+      )}
+
+      {peek && view === 'pages' && (
+        <button
+          onClick={() => choose('city', false)}
+          className="fixed bottom-16 left-1/2 -translate-x-1/2 z-20 bg-zinc-800 border border-zinc-600 rounded-full px-4 py-2 text-xs font-semibold text-zinc-100 shadow-lg"
+        >
+          🏙 back to City
+        </button>
       )}
     </main>
   )

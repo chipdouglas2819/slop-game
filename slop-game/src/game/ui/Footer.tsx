@@ -98,16 +98,21 @@ export function Footer() {
 
             {open === 'howto' && (
               <div className="p-4 space-y-3 text-sm text-zinc-300">
+                <HowToRow icon="🏙" title="Your empire is the city">
+                  Tap a building with a $ bubble to publish. Tap any other building to inspect
+                  it in the strip below the skyline. The gold glow is always your next best move.
+                </HowToRow>
                 <HowToRow icon="📝" title="Post slop, make money">
-                  Each page auto-posts and earns cash. Buy more copies to earn faster; the
-                  numbers go up.
+                  Buy more copies and a page earns faster; buildings grow as they do. The
+                  numbers go up. That's the whole internet now.
                 </HowToRow>
                 <HowToRow icon="🧑‍💼" title="Hire a Manager">
-                  Tired of tapping Publish? Hire a Manager and the page runs itself.
+                  Tired of tapping? Hire a Manager and the building runs itself — windows stay
+                  lit, money keeps flowing.
                 </HowToRow>
                 <HowToRow icon="⚙" title="Tune = what you post">
-                  Tap ⚙ Tune on a page to pick what it posts and how it's pushed (★★★ = best fit
-                  for that platform).
+                  Select a building (or open ☰ Pages) and tap ⚙ Tune to pick what it posts and
+                  how it's pushed (★★★ = best fit for that platform).
                 </HowToRow>
                 <HowToRow icon="🔥" title="Trending = bonus money">
                   The bar up top shows what's hot right now. Switch a page's Topic to match it
@@ -154,8 +159,9 @@ export function Footer() {
                   and see exactly how the machine works from the inside.
                 </p>
                 <p className="text-[11px] text-zinc-600 italic">
-                  Phase 1 prototype. Era II–IV, scandals, bots, and the bounded cursed coda
-                  arrive in later builds.
+                  Eras I–III are live: the SEO mill, social slop with bots and crackdowns, and
+                  Pulling the Plug. Era IV — and actually killing the internet — arrives in a
+                  later build.
                 </p>
               </div>
             )}

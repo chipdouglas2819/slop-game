@@ -41,15 +41,18 @@ export function MapDock({
     return () => {
       if (performance.now() < guardUntil.current) return
       fn()
+      // re-arm: the panel morphs in place after actions (Open it → Start →
+      // Buy to ×N, Hire → Tune) — a double-tap must not land on the morph
+      guardUntil.current = performance.now() + 280
     }
   }
 
   const pageIdx = selected ? state.pages.findIndex((p) => p.defId === selected) : -1
   const page = pageIdx >= 0 ? state.pages[pageIdx] : null
 
-  // the Tune sheet must not outlive its page (prestige wipes) or its manager
+  // the Tune sheet must not outlive its page (prestige wipes its units)
   useEffect(() => {
-    if (tuneOpen && (!page || !page.manager)) setTuneOpen(false)
+    if (tuneOpen && (!page || page.units === 0)) setTuneOpen(false)
   }, [tuneOpen, page])
 
   const target = beaconTargetSlotId(state, action)
@@ -57,7 +60,7 @@ export function MapDock({
     target && target !== selected ? (
       <button
         onClick={() => onSelect(target)}
-        className="shrink-0 text-[10px] font-semibold text-amber-300 border border-amber-500/50 bg-amber-950/40 rounded-full px-2 py-0.5"
+        className="shrink-0 text-[10px] font-semibold text-amber-300 border border-amber-500/50 bg-amber-950/40 rounded-full px-2.5 py-1"
       >
         → next
       </button>
@@ -95,9 +98,13 @@ export function MapDock({
         </button>
       )
     } else {
+      // don't claim the city runs itself while the economy is still hand-cranked
+      const anyManual = state.pages.some((p) => p.units > 0 && !p.manager)
       inner = (
         <div className="w-full text-center text-xs italic text-zinc-500 py-2.5">
-          the city runs itself. tap a building to inspect it.
+          {anyManual
+            ? 'tap a $ bubble to publish · tap any building to inspect'
+            : 'the city runs itself. tap a building to inspect it.'}
         </div>
       )
     }
@@ -213,8 +220,23 @@ export function MapDock({
       </button>
     )
   else if (crackdownHere) status = <span className="text-cyan-300">🚨 crackdown — earnings cut until the bar empties</span>
-  else if (overused) status = <span className="text-orange-300">💨 topic worn out — ⚙ Tune it</span>
+  else if (overused)
+    // a button: manual pages have no Tune slot (it holds Hire Mgr), so the
+    // words ARE the control
+    status = (
+      <button
+        onClick={() => {
+          sfx('uiOpen')
+          setTuneOpen(true)
+        }}
+        className="text-orange-300 text-left"
+      >
+        💨 topic worn out — ⚙ Tune it
+      </button>
+    )
   else if (page.manager && dps < 0) status = <span className="text-red-400">⚠ the model costs more than it earns</span>
+  else if (page.units === 0 && page.manager)
+    status = <span className="text-zinc-500 italic">manager retained — buy a unit to restart</span>
   else if (page.units > 0)
     status = (
       <span className="text-zinc-500">
@@ -260,7 +282,7 @@ export function MapDock({
             />
             <span className="relative">{inFlight ? `…${fmtSeconds(cycleSec * (1 - page.cycleProgress))}` : 'Publish'}</span>
           </button>
-        ) : page.manager ? (
+        ) : page.manager && page.units > 0 ? (
           <div className="rounded-lg border border-zinc-800 text-zinc-600 text-[10px] flex items-center justify-center">
             🧑‍💼 auto
           </div>
@@ -301,7 +323,7 @@ export function MapDock({
             Hire Mgr
             <span className="block text-[9px] font-mono font-normal opacity-80">{fmtMoney(mgrCost)}</span>
           </button>
-        ) : page.manager && state.progression.topicChipUnlocked ? (
+        ) : page.manager && page.units > 0 && state.progression.topicChipUnlocked ? (
           <button
             onClick={guarded(() => {
               sfx('uiOpen')
@@ -309,7 +331,7 @@ export function MapDock({
             })}
             className={`rounded-lg py-2 text-xs font-semibold border ${
               spotlightTune
-                ? 'border-fuchsia-400 ring-2 ring-fuchsia-500/60 animate-pulse bg-fuchsia-950/40 text-zinc-100'
+                ? 'border-fuchsia-400 ring-2 ring-fuchsia-500/60 animate-pulse motion-reduce:animate-none bg-fuchsia-950/40 text-zinc-100'
                 : recTune
                 ? 'bg-zinc-800 border-zinc-700 text-zinc-100 ring-2 ring-amber-400'
                 : 'bg-zinc-800 border-zinc-700 text-zinc-100'
@@ -324,14 +346,14 @@ export function MapDock({
 
       {page.units > 0 && (
         <button
-          onClick={() => onOpenDetails(pageIdx)}
-          className="text-[10px] text-zinc-500 hover:text-zinc-300 text-center -mt-0.5"
+          onClick={guarded(() => onOpenDetails(pageIdx))}
+          className="text-[10px] text-zinc-500 hover:text-zinc-300 text-center py-1"
         >
           full details (buy ×10 / ×100 / MAX) →
         </button>
       )}
 
-      {tuneOpen && page.manager && <TuneSheet pageIdx={pageIdx} onClose={() => setTuneOpen(false)} />}
+      {tuneOpen && page.units > 0 && <TuneSheet pageIdx={pageIdx} onClose={() => setTuneOpen(false)} />}
     </div>
   )
 }
@@ -373,7 +395,7 @@ function DockHeader({
         </span>
       )}
       {extra}
-      <button onClick={onClose} aria-label="Deselect" className="shrink-0 text-zinc-600 hover:text-zinc-300 px-1.5 py-1 text-sm">
+      <button onClick={onClose} aria-label="Deselect" className="shrink-0 text-zinc-600 hover:text-zinc-300 p-2 -m-1 text-sm">
         ✕
       </button>
     </div>

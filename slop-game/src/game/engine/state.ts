@@ -652,7 +652,8 @@ export function pageCycleSec(state: GameState, pageIdx: number): number | null {
   return effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
 }
 
-// Per-tap payout (for the Publish button label).
+// Per-tap payout (for the Publish button label). Applies the simulated 2× ad
+// boost so every advertised number agrees with what TICK actually credits.
 export function pageTapPayout(state: GameState, pageIdx: number): {
   dollars: number
   modelCost: number
@@ -660,16 +661,18 @@ export function pageTapPayout(state: GameState, pageIdx: number): {
   const p = state.pages[pageIdx]
   if (!p) return { dollars: 0, modelCost: 0 }
   const oc = oneCyclePayout(state, p)
-  return { dollars: oc.dollars, modelCost: oc.modelCost }
+  const boost = boostActive(state, state.lastTickAt) ? 2 : 1
+  return { dollars: oc.dollars * boost, modelCost: oc.modelCost }
 }
 
-// Per-second payout (for manager-on pages).
+// Per-second payout (for manager-on pages). Boost-aware, same as above.
 export function pageDollarsPerSec(state: GameState, pageIdx: number): number {
   const p = state.pages[pageIdx]
   if (!p || p.units <= 0) return 0
   const oc = oneCyclePayout(state, p)
+  const boost = boostActive(state, state.lastTickAt) ? 2 : 1
   const cycleSec = effectiveCycleSec(PAGE_SLOT_BY_ID[p.defId], p.units)
-  return oc.dollars / cycleSec - oc.modelCost / cycleSec
+  return (oc.dollars * boost) / cycleSec - oc.modelCost / cycleSec
 }
 
 // no-op references so re-exports stay tree-shakable

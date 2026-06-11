@@ -140,9 +140,14 @@ input[type="range"] {
   transform-origin: 50% 100%;
 }
 
-/* decorative loops off for reduced-motion users; status stays color-static */
+/* decorative loops off for reduced-motion users; status stays color-static.
+   Smoke is STATUS (worn-out topic) whose visibility normally comes from its
+   animation — give it a static presence when the animation is killed. */
 @media (prefers-reduced-motion: reduce) {
   .city-anim {
     animation: none !important;
+  }
+  .city-smoke {
+    opacity: 0.5 !important;
   }
 }

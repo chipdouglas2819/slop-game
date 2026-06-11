@@ -50,7 +50,9 @@ export function applyAlgorithmUpdate(state: GameState, now: number): GameState {
     engagements: new Decimal(0),
     slopTokens: state.slopTokens + gained,
     algorithmUpdatesCompleted: state.algorithmUpdatesCompleted + 1,
-    pages: state.pages.map((p) => ({ ...p, units: 0, bots: 0 })),
+    // cycleProgress must die too (PULL_PLUG already zeroes it) — a surviving
+    // half-cycle would resume on the first rebuy and pay a publish nobody made
+    pages: state.pages.map((p) => ({ ...p, units: 0, bots: 0, cycleProgress: 0 })),
     affinity: newAffinity,
     saturation: {}, // recipes start fresh after a shake-up
     trend: rollTrend({ legible: wasFirst ? false : state.trend.legible, now }),

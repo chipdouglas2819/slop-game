@@ -58,7 +58,8 @@ function deserialize(s: Serialized): GameState {
     topicChipUnlocked: lp.topicChipUnlocked ?? anyManager,
     tacticChipUnlocked: lp.tacticChipUnlocked ?? (s.algorithmUpdatesCompleted ?? 0) > 0,
     modelChipUnlocked: lp.modelChipUnlocked ?? (s.eraJumps ?? 0) > 0,
-    firstTapDone: lp.firstTapDone ?? (s.pages ?? []).some((p) => p.units > 0),
+    // anyManager witnesses past taps even in a post-prestige save (units all 0)
+    firstTapDone: lp.firstTapDone ?? ((s.pages ?? []).some((p) => p.units > 0) || anyManager),
     firstManagerBought: lp.firstManagerBought ?? anyManager,
     firstRetuneDone: lp.firstRetuneDone ?? lp.tacticChipUnlocked ?? false,
     firstScandalSeen: lp.firstScandalSeen ?? (s.scandalCooldownUntil ?? 0) > 0,
